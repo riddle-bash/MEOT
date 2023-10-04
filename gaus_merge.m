@@ -14,7 +14,7 @@ end
 while ~isempty(I)
     [~,j]= max(w); j= j(1);
     Ij= []; iPt= inv(P(:,:,j));
-    w_new(el,1)= 0; 
+    w_new(el,1)= 0;
     x_new(:,el)= zeros(x_dim,1); P_new(:,:,el)= zeros(x_dim,x_dim);
     for i= I
         val= (x(:,i)-x(:,j))'*iPt*(x(:,i)-x(:,j));

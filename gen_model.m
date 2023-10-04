@@ -1,7 +1,7 @@
 function model = gen_model
 % Transition model
 model.xdim = 4;      % x dimension
-model.dt = 10;       % sampling period
+model.dt = 1;       % sampling period
 model.F = [1 0 model.dt 0;
            0 1 0 model.dt;
            0 0 1 0;
@@ -43,6 +43,7 @@ model.B_birth(:,:,1)= diag([100 100 100 100]).^2;
 % Detection parameters
 model.P_D = 0.99;       % probability of detection in measurements
 model.P_MD= 1-model.P_D; % probability of missed detection in measurements
+
 % Clutter parameters
 model.lambda_c = 5; % clutter rate
 model.range_c= [-100 100; -100 100];      % uniform clutter region
