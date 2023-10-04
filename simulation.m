@@ -5,13 +5,13 @@
 % False Alarm: Poisson
 % Birth:
 
-clc, clear;
+clc, clear, close all;
 %% Simulation setting
 duration = 100;
 model = gen_model;
 
 %% Ground-truth, noise setting
-
+ 
 gt1(:,1) = [-250;-250;12;-2.5];
 gt2(:,1) = [250;250;2.5;-12];
 
@@ -54,9 +54,9 @@ for k = 2:duration
     [m_predict, P_predict] = predict_KF(model, m_update{k-1}, P_update{k-1});
     w_predict = model.P_S * w_update{k-1};
     % Cat with append birth object
-%     m_predict = cat(2, model.m_birth, m_predict);
-%     P_predict = cat(3, model.P_birth, P_predict);
-%     w_predict = cat(1, model.w_birth, w_predict);
+    m_predict = cat(2, model.m_birth, m_predict);
+    P_predict = cat(3, model.P_birth, P_predict);
+    w_predict = cat(1, model.w_birth, w_predict);
 %     L_predict= model.L_birth + L_update;    %number of objects
 
     %% Update
@@ -120,39 +120,55 @@ end
 
 %% Plot and visualize
 figure(1);
-subplot(311);
+subplot(211);
 hold on;
-plot(gt1(1,:),gt1(2,:));
-plot(gt2(1,:),gt2(2,:));
-xlim([-400 1000]);
-ylim([-1000 400]);
-
-subplot(312);
-hold on;
-plot(1:duration,gt1(1,:),'k.');
-plot(1:duration,gt2(1,:),'k.');
 for t = 1:duration
-plot(t,c(1,:,t),'kx');
+    if ~isempty(est{t})
+        plot(t,est{t}(1,:),'kx');
+    end
+    plot(t,gt1(1,t),'b.');
+    plot(t,gt2(1,t),'b.');
+    plot(t,c(1,:,t),'k+','MarkerSize',1);
 end
+ylabel('X coordinate (in m)');
+xlabel('time step');
 
-subplot(313);
+subplot(212);
 hold on;
-plot(1:duration,gt1(2,:),'k.');
-plot(1:duration,gt2(2,:),'k.');
 for t = 1:duration
-plot(t,c(2,:,t),'kx');
+    if ~isempty(est{t})
+        plot(t,est{t}(2,:),'kx');
+    end
+    plot(t,gt1(2,t),'b.');
+    plot(t,gt2(2,t),'b.');
+    plot(t,c(2,:,t),'k+','MarkerSize',1);
 end
+ylabel('Y coordinate (in m)');
+xlabel('time step');
 
 
-figure(2); hold on;
+figure(2); 
+hold on;
 for t = 2:duration
     for k = 1:num_objects(t)
-        plot(est{t}(1, k), est{t}(2, k), 'b*');
+        est_plot = plot(est{t}(1, k), est{t}(2, k), 'b*');
     end
 end
-plot(gt1(1,:),gt1(2,:));
-plot(gt2(1,:),gt2(2,:));
-%% Evaluation
+gt_plot = plot(gt1(1,:),gt1(2,:));
+gt_plot = plot(gt2(1,:),gt2(2,:));
+legend([est_plot, gt_plot],'Estimations','Ground-truth','Location','northeast');
 
+%% Evaluation
+% figure(3);
+% hold on;
+% for t = 1:duration
+%     if ~isempty(est{t})
+%         ospa1(t) = ospa_dist(est{t}(1:2,1),gt1(1:2,t),200,1);
+%     else
+%         ospa1(t) = ospa_dist([0; 0],gt1(1:2,t),200,1);
+%     end
+% end
+% 
+% plot(1:duration, ospa1);
 
 %% 
