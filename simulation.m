@@ -54,10 +54,10 @@ for k = 2:duration
     [m_predict, P_predict] = predict_KF(model, m_update{k-1}, P_update{k-1});
     w_predict = model.P_S * w_update{k-1};
     % Cat with append birth object
-%     m_predict = cat(2, model.m_birth, m_predict);
-%     P_predict = cat(3, model.P_birth, P_predict);
-%     w_predict = cat(1, model.w_birth, w_predict);
-%     L_predict= model.L_birth + L_update;    %number of objects
+    m_predict = cat(2, model.m_birth, m_predict);
+    P_predict = cat(3, model.P_birth, P_predict);
+    w_predict = cat(1, model.w_birth, w_predict);
+    L_predict= model.L_birth + L_update;    %number of objects
 
     %% Update
     n = size(z{k},2);       %number of measurement
