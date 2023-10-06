@@ -31,14 +31,15 @@ model.R = [.5 0;
 model.R = model.R * Meas_noise_mag;
 
 % Birth parameters
-model.L_birth = 1;
+model.L_birth = 2;
 model.w_birth= zeros(model.L_birth,1);                                %weights of Gaussian birth terms (per duration)
 model.m_birth= zeros(model.xdim,model.L_birth);                       %means of Gaussian birth terms 
 model.P_birth= zeros(model.xdim,model.xdim,model.L_birth);            %cov of Gaussian birth terms
 
-model.w_birth(1)= 3/100;                                              %birth term 1
-model.m_birth(:,1)= [ 0; 0; 0; 0 ];
-model.B_birth(:,:,1)= diag([100 100 100 100]).^2;
+model.w_birth= [.01; .01];                                              %birth term 1
+model.m_birth= [ [250; 250; 0; 0] [-250; -250; 0; 0] ];
+model.P_birth(:,:,1)= diag([100, 100, 25, 25]);
+model.P_birth(:,:,2)= diag([100, 100, 25, 25]);
 
 % Detection parameters
 model.P_D = 0.99;       % probability of detection in measurements

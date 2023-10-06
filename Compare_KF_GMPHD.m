@@ -7,39 +7,38 @@
 
 clc, clear, close all;
 %% Simulation setting
-duration = 100;
+duration = 10;
 model = gen_model;
 
 %% Ground-truth, noise setting
  
-gt1(:,1) = [-250;-250;12;-2.5];
-gt2(:,1) = [250;250;2.5;-12];
+gt(:,1) = [-250;-250;2;3];
 
 for i = 2:duration
-    gt1(:,i) = model.F * gt1(:,i-1);
-    gt2(:,i) = model.F * gt2(:,i-1);
+    gt(:,i) = model.F * gt(:,i-1);
 end
 
 %% Generate measurement
 for i = 1:duration
-    z1 = gt1(1:2,i);
-    z2 = gt2(1:2,i);
-
+    z = repmat(model.H * gt(:, i),1,1) + mvnrnd(zeros(1,model.zdim),model.R,1)';
     region = [-1000,1000;
         -1000, 1000];
     c(:,:,i) = [unifrnd(-1000,1000,1,50);unifrnd(-1000,1000,1,50)];
-
-    z{i} = [z1 z2 c(:, :, i)];
+    z{i} = z;
+    z{i} = cat(2, z{i}, c(:, :, i));
 end
 
 %% Prior
-w_update{1} = [0.5; 0.5];
+% Kalman
+KM_m_update{1}(:, 1) = [100; 100; 10; 10];
+KM_P_update{1}(:, :, 1) = diag([100 100 100 100]).^2;
+
+% GM-PHD
+w_update{1} = 0.5;
 m_update{1}(:, 1) = [100; 100; 10; 10];
 P_update{1}(:, :, 1) = diag([100 100 100 100]).^2;
-m_update{1}(:, 2) = [200; 100; 10; 10];
-P_update{1}(:, :, 2) = diag([100 100 100 100]).^2;
 % D{1} = gmdistribution(m_update{1}, P_update{1}, w_update{1});
-L_update = 2;
+L_update = 1;
 est = cell(duration, 1);
 num_objects = zeros(duration, 1);
 
@@ -51,16 +50,25 @@ L_max = 100;                  % limit on number of Gaussian components
 %% Recursive filtering
 for k = 2:duration
     %% Predict
+    % Kalman
+    [KM_m_predict, KM_P_predict] = predict_KF(model, KM_m_update{k-1}, KM_P_update{k-1});
+    % GM-PHD
     [m_predict, P_predict] = predict_KF(model, m_update{k-1}, P_update{k-1});
     w_predict = model.P_S * w_update{k-1};
     % Cat with append birth object
-    m_predict = cat(2, model.m_birth, m_predict);
-    P_predict = cat(3, model.P_birth, P_predict);
-    w_predict = cat(1, model.w_birth, w_predict);
+%     m_predict = cat(2, model.m_birth, m_predict);
+%     P_predict = cat(3, model.P_birth, P_predict);
+%     w_predict = cat(1, model.w_birth, w_predict);
 %     L_predict= model.L_birth + L_update;    %number of objects
 
     %% Update
     n = size(z{k},2);       %number of measurement
+    % Kalman
+    for i = 1:n
+        [KM_m_update{k}, KM_P_update{k}] = update_single(z{k}, model.H, model.R, KM_m_predict, KM_P_predict);
+    end
+    
+    % GM-PHD
 
     % miss detectection
     w_update{k} = model.P_MD*w_predict;
@@ -75,7 +83,7 @@ for k = 2:duration
         for i = 1:n
             % Calculate detection weight of each probable object detect
             w_temp = model.P_D * w_predict .* likelihood_tmp(:,i);
-            w_temp = w_temp ./ (model.lambda_c*model.pdf_c + sum(w_temp));
+            w_temp = w_temp ./ (sum(w_temp));
             % Cat all of them to a vector of weight
             w_update{k} = cat(1,w_update{k},w_temp);
             % Update mean and covariance
@@ -108,6 +116,7 @@ for k = 2:duration
         est{k}= [ est{k} repmat(m_update{k}(:,idx(i)),[1, num_targets]) ];
         num_objects(k) = num_objects(k) + num_targets;
     end
+
     %---display diagnostics
     disp([' time= ',num2str(k),...
          ' #gaus orig=',num2str(L_posterior),...
@@ -126,9 +135,7 @@ for t = 1:duration
     if ~isempty(est{t})
         plot(t,est{t}(1,:),'kx');
     end
-    plot(t,gt1(1,t),'b.');
-    plot(t,gt2(1,t),'b.');
-    plot(t,c(1,:,t),'k+','MarkerSize',1);
+    plot(t,gt(1,t),'b.');
 end
 ylabel('X coordinate (in m)');
 xlabel('time step');
@@ -139,9 +146,7 @@ for t = 1:duration
     if ~isempty(est{t})
         plot(t,est{t}(2,:),'kx');
     end
-    plot(t,gt1(2,t),'b.');
-    plot(t,gt2(2,t),'b.');
-    plot(t,c(2,:,t),'k+','MarkerSize',1);
+    plot(t,gt(2,t),'b.');
 end
 ylabel('Y coordinate (in m)');
 xlabel('time step');
@@ -153,10 +158,13 @@ for t = 2:duration
     for k = 1:num_objects(t)
         est_plot = plot(est{t}(1, k), est{t}(2, k), 'b*');
     end
+    meas_plot = plot(z{t}(1, :), z{t}(2, :), 'k.');
+    KM_plot = plot(KM_m_update{t}(1, 1), KM_m_update{t}(2, 1), 'kh');
 end
-gt_plot = plot(gt1(1,:),gt1(2,:));
-gt_plot = plot(gt2(1,:),gt2(2,:));
-legend([est_plot, gt_plot],'Estimations','Ground-truth','Location','northeast');
+gt_plot = plot(gt(1,:),gt(2,:));
+
+legend([est_plot, gt_plot, meas_plot],'Estimations','Ground-truth', 'Measurement','Location','northeast');
+%legend([est_plot],'Estimations','Location','northeast');
 
 %% Evaluation
 % figure(3);
