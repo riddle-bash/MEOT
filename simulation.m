@@ -22,14 +22,14 @@ end
 
 %% Generate measurement
 for i = 1:duration
-    z1 = gt1(1:2,i);
-    z2 = gt2(1:2,i);
+    z1 = gt1(1:2,i) + mvnrnd(0,10,2,1);
+%     z2 = gt2(1:2,i);
 
     region = [-1000,1000;
         -1000, 1000];
-    c(:,:,i) = [unifrnd(-1000,1000,1,50);unifrnd(-1000,1000,1,50)];
+    c(:,:,i) = [unifrnd(-400,1000,1,50);unifrnd(-1000,400,1,50)];
 
-    z{i} = [z1 z2 c(:, :, i)];
+    z{i} = [z1 c(:, :, i)];
 end
 
 %% Prior
@@ -101,13 +101,28 @@ for k = 2:duration
     L_update= L_cap;
 
     % Estimate x
-    idx = find(w_update{k} > 0.5 );
-    for i = 1:length(idx)
-        %num of targets in each density
-        num_targets = round(w_update{k}(idx(i)));
-        est{k}= [ est{k} repmat(m_update{k}(:,idx(i)),[1, num_targets]) ];
-        num_objects(k) = num_objects(k) + num_targets;
+%     idx = find(w_update{k} > 0.5 );
+%     for i = 1:length(idx)
+%         %num of targets in each density
+%         num_targets = round(w_update{k}(idx(i)));
+%         est{k}= [ est{k} repmat(m_update{k}(:,idx(i)),[1, num_targets]) ];
+%     end
+
+    num_objects(k) = round(sum(w_update{k}));
+    num_targets = num_objects(k);
+    w_copy = w_update{k};
+    indices = [];
+
+    for i = 1:num_objects(k)
+        [~, maxIndex] = max(w_copy);
+        indices(i) = maxIndex;
+        w_copy(maxIndex) = -inf;
     end
+
+    for i = 1:size(indices,2)
+        est{k} = [est{k} m_update{k}(:,i)];
+    end
+
     %---display diagnostics
     disp([' time= ',num2str(k),...
          ' #gaus orig=',num2str(L_posterior),...
@@ -127,7 +142,7 @@ for t = 1:duration
         plot(t,est{t}(1,:),'kx');
     end
     plot(t,gt1(1,t),'b.');
-    plot(t,gt2(1,t),'b.');
+%     plot(t,gt2(1,t),'b.');
     plot(t,c(1,:,t),'k+','MarkerSize',1);
 end
 ylabel('X coordinate (in m)');
@@ -140,7 +155,7 @@ for t = 1:duration
         plot(t,est{t}(2,:),'kx');
     end
     plot(t,gt1(2,t),'b.');
-    plot(t,gt2(2,t),'b.');
+%     plot(t,gt2(2,t),'b.');
     plot(t,c(2,:,t),'k+','MarkerSize',1);
 end
 ylabel('Y coordinate (in m)');
@@ -153,10 +168,12 @@ for t = 2:duration
     for k = 1:num_objects(t)
         est_plot = plot(est{t}(1, k), est{t}(2, k), 'b*');
     end
+    plot(c(1,:,t), c(2,:,t), 'k.', 'MarkerSize',1);
 end
-gt_plot = plot(gt1(1,:),gt1(2,:));
-gt_plot = plot(gt2(1,:),gt2(2,:));
+gt_plot = plot(gt1(1,:),gt1(2,:),'-r');
+% gt_plot = plot(gt2(1,:),gt2(2,:));
 legend([est_plot, gt_plot],'Estimations','Ground-truth','Location','northeast');
+% legend([gt_plot],'Ground-truth','Location','northeast');
 
 %% Evaluation
 % figure(3);
