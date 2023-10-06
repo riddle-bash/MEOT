@@ -12,7 +12,7 @@ model = gen_model;
 
 %% Ground-truth, noise setting
  
-gt(:,1) = [-250;-250;2;3];
+gt(:,1) = [0;0;2;3];
 
 for i = 2:duration
     gt(:,i) = model.F * gt(:,i-1);
@@ -20,17 +20,17 @@ end
 
 %% Generate measurement
 for i = 1:duration
-    z{i} = repmat(model.H * gt(:, i),1,2) + mvnrnd(zeros(1,model.zdim),model.R,2)';
+    z{i} = repmat(model.H * gt(:, i),1,1) + mvnrnd(0,1,2,1);
 end
 
 %% Prior
 % Kalman
-KM_m_update{1}(:, 1) = [100; 100; 10; 10];
+KM_m_update{1}(:, 1) = [0; 0; 10; 10];
 KM_P_update{1}(:, :, 1) = diag([100 100 100 100]).^2;
 
 % GM-PHD
 w_update{1} = [0.5];
-m_update{1}(:, 1) = [100; 100; 10; 10];
+m_update{1}(:, 1) = [0; 0; 10; 10];
 P_update{1}(:, :, 1) = diag([100 100 100 100]).^2;
 % D{1} = gmdistribution(m_update{1}, P_update{1}, w_update{1});
 L_update = 1;
@@ -104,12 +104,19 @@ for k = 2:duration
     L_update= L_cap;
 
     % Estimate x
-    idx = find(w_update{k} > 0.5 );
-    for i = 1:length(idx)
-        %num of targets in each density
-        num_targets = round(w_update{k}(idx(i)));
-        est{k}= [ est{k} repmat(m_update{k}(:,idx(i)),[1, num_targets]) ];
-        num_objects(k) = num_objects(k) + num_targets;
+    num_objects(k) = round(sum(w_update{k}));
+    num_targets = num_objects(k);
+    w_copy = w_update{k};
+    indices = [];
+
+    for i = 1:num_objects(k)
+        [~, maxIndex] = max(w_copy);
+        indices(i) = maxIndex;
+        w_copy(maxIndex) = -inf;
+    end
+
+    for i = 1:size(indices,2)
+        est{k} = [est{k} m_update{k}(:,i)];
     end
 
     %---display diagnostics
@@ -154,11 +161,13 @@ for t = 2:duration
         est_plot = plot(est{t}(1, k), est{t}(2, k), 'b*');
     end
     meas_plot = plot(z{t}(1, :), z{t}(2, :), 'k.');
-    KM_plot = plot(KM_m_update{t}(1, 1), KM_m_update{t}(2, 1), 'kh');
+    KM_plot = plot(KM_m_update{t}(1, 1), KM_m_update{t}(2, 1), 'go');
 end
 gt_plot = plot(gt(1,:),gt(2,:));
-
-legend([est_plot, gt_plot, meas_plot],'Estimations','Ground-truth', 'Measurement','Location','northeast');
+xlabel('Position X');
+ylabel('Position Y');
+title('Tracking Estimation');
+legend([est_plot, KM_plot, gt_plot, meas_plot],'GM-PHD','Kalman Filter','Ground-truth', 'Measurement', 'Location','southeast');
 %legend([est_plot],'Estimations','Location','northeast');
 
 %% Evaluation
