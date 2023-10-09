@@ -37,7 +37,7 @@ model.m_birth= zeros(model.xdim,model.L_birth);                       %means of 
 model.P_birth= zeros(model.xdim,model.xdim,model.L_birth);            %cov of Gaussian birth terms
 
 model.w_birth= [.01; .01];                                              %birth term 1
-model.m_birth= [ [250; 250; 0; 0] [-250; -250; 0; 0] ];
+model.m_birth= [ [647; -435; 0; 0] [-250; -250; 0; 0] ];
 model.P_birth(:,:,1)= diag([100, 100, 25, 25]);
 model.P_birth(:,:,2)= diag([100, 100, 25, 25]);
 
@@ -46,6 +46,6 @@ model.P_D = 0.99;       % probability of detection in measurements
 model.P_MD= 1-model.P_D; % probability of missed detection in measurements
 
 % Clutter parameters
-model.lambda_c = 5; % clutter rate
-model.range_c= [-100 100; -100 100];      % uniform clutter region
+model.lambda_c = 50; % clutter rate
+model.range_c= [-400 1000; -1000 400];      % uniform clutter region
 model.pdf_c= 1/prod(model.range_c(:,2)-model.range_c(:,1)); % uniform clutter density
