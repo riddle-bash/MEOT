@@ -1,5 +1,9 @@
 % Measurements generating for GM-PHD Multiple Extended Object Tracking
 % --------------------------------------------------------------------
+% --------This simulation follows Example 1 of B. Ngu Vo's------------
+% -----"The Gaussian Mixture Probability Hypothesis Density Filter"---
+%-----------located in Page. 8/13, Fig. 1-3 of the paper--------------
+%---------------------------------------------------------------------
 % Object numbers: 2
 % Transition noise, measurement noise: Gauss
 % False Alarm: Poisson
@@ -23,13 +27,13 @@ end
 %% Generate measurement
 for i = 1:duration
     z1 = gt1(1:2,i) + mvnrnd(0,10,2,1);
-%     z2 = gt2(1:2,i);
+    z2 = gt2(1:2,i) + mvnrnd(0,10,2,1);
 
     region = [-1000,1000;
         -1000, 1000];
-    c(:,:,i) = [unifrnd(-400,1000,1,50);unifrnd(-1000,400,1,50)];
+    c(:,:,i) = [unifrnd(-1000,1000,1,50);unifrnd(-1000,1000,1,50)];
 
-    z{i} = [z1 c(:, :, i)];
+    z{i} = [z1 z2 c(:, :, i)];
 end
 
 %% Prior
@@ -100,14 +104,6 @@ for k = 2:duration
     
     L_update= L_cap;
 
-    % Estimate x
-%     idx = find(w_update{k} > 0.5 );
-%     for i = 1:length(idx)
-%         %num of targets in each density
-%         num_targets = round(w_update{k}(idx(i)));
-%         est{k}= [ est{k} repmat(m_update{k}(:,idx(i)),[1, num_targets]) ];
-%     end
-
     num_objects(k) = round(sum(w_update{k}));
     num_targets = num_objects(k);
     w_copy = w_update{k};
@@ -142,7 +138,7 @@ for t = 1:duration
         plot(t,est{t}(1,:),'kx');
     end
     plot(t,gt1(1,t),'b.');
-%     plot(t,gt2(1,t),'b.');
+    plot(t,gt2(1,t),'b.');
     plot(t,c(1,:,t),'k+','MarkerSize',1);
 end
 ylabel('X coordinate (in m)');
@@ -155,7 +151,7 @@ for t = 1:duration
         plot(t,est{t}(2,:),'kx');
     end
     plot(t,gt1(2,t),'b.');
-%     plot(t,gt2(2,t),'b.');
+    plot(t,gt2(2,t),'b.');
     plot(t,c(2,:,t),'k+','MarkerSize',1);
 end
 ylabel('Y coordinate (in m)');
@@ -171,9 +167,10 @@ for t = 2:duration
     plot(c(1,:,t), c(2,:,t), 'k.', 'MarkerSize',1);
 end
 gt_plot = plot(gt1(1,:),gt1(2,:),'-r');
-% gt_plot = plot(gt2(1,:),gt2(2,:));
+gt_plot = plot(gt2(1,:),gt2(2,:),'-r');
+xlim([-400 1000]);
+ylim([-1000 400]);
 legend([est_plot, gt_plot],'Estimations','Ground-truth','Location','northeast');
-% legend([gt_plot],'Ground-truth','Location','northeast');
 
 %% Evaluation
 % figure(3);
