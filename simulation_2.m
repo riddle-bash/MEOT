@@ -1,6 +1,6 @@
 % GM-PHD Object Tracking with Model Birth and Death
 % --------------------------------------------------------------------
-% Object numbers: 2
+% Object numbers: 1
 % Transition noise, measurement noise: Gauss
 % False Alarm: Poisson
 % Birth:at time step 1 and 76
@@ -22,18 +22,18 @@ for i = 2:duration
 end
 
 %% Generate measurement
+model.lambda_c = 50;
+model.range_c = [-400, 1000; -1000, 400];
+model.pdf_c= 1/prod(model.range_c(:,2)-model.range_c(:,1));
+
 for i = 1:duration
-%     z2 = gt2(1:2,i);
-
-    region = [-1000,1000;
-        -1000, 1000];
     c(:,:,i) = [unifrnd(-400,1000,1,50);unifrnd(-1000,400,1,50)];
-
+    
     if i < 50 || i > 75
-        z1 = gt1(1:2,i) + mvnrnd(0,10,2,1);
+        z1 = gt1(1:2,i) + mvnrnd(0,5,2,1);
         z{i} = [z1 c(:, :, i)];
     else
-    z{i} = [c(:, :, i)];
+        z{i} = [c(:, :, i)];
     end
 end
 
@@ -59,9 +59,9 @@ for k = 2:duration
     [m_predict, P_predict] = predict_KF(model, m_update{k-1}, P_update{k-1});
     w_predict = model.P_S * w_update{k-1};
     % Cat with append birth object
-    m_predict = cat(2, model.m_birth, m_predict);
-    P_predict = cat(3, model.P_birth, P_predict);
-    w_predict = cat(1, model.w_birth, w_predict);
+    m_predict = cat(2, model.m_birth_2, m_predict);
+    P_predict = cat(3, model.P_birth_2, P_predict);
+    w_predict = cat(1, model.w_birth_2, w_predict);
 %     L_predict= model.L_birth + L_update;    %number of objects
 
     %% Update
@@ -104,14 +104,6 @@ for k = 2:duration
     L_cap= length(w_update{k});
     
     L_update= L_cap;
-
-    % Estimate x
-%     idx = find(w_update{k} > 0.5 );
-%     for i = 1:length(idx)
-%         %num of targets in each density
-%         num_targets = round(w_update{k}(idx(i)));
-%         est{k}= [ est{k} repmat(m_update{k}(:,idx(i)),[1, num_targets]) ];
-%     end
 
     num_objects(k) = round(sum(w_update{k}));
     num_targets = num_objects(k);
@@ -177,20 +169,23 @@ for t = 2:duration
 end
 gt_plot = plot(gt1(1,:),gt1(2,:),'-r');
 % gt_plot = plot(gt2(1,:),gt2(2,:));
-% legend([est_plot, gt_plot],'Estimations','Ground-truth','Location','northeast');
+legend([est_plot, gt_plot],'Estimations','Ground-truth','Location','northeast');
 % legend([gt_plot],'Ground-truth','Location','northeast');
 
 %% Evaluation
-% figure(3);
-% hold on;
-% for t = 1:duration
-%     if ~isempty(est{t})
-%         ospa1(t) = ospa_dist(est{t}(1:2,1),gt1(1:2,t),200,1);
-%     else
-%         ospa1(t) = ospa_dist([0; 0],gt1(1:2,t),200,1);
-%     end
-% end
-% 
-% plot(1:duration, ospa1);
+figure(3);
+hold on;
+for t = 1:duration
+    if ~isempty(est{t})
+        ospa1(t) = ospa_dist(est{t}(1:2,1),gt1(1:2,t),30,1);
+    else
+        ospa1(t) = ospa_dist([0; 0],gt1(1:2,t),30,1);
+    end
+end
+
+plot(1:duration, ospa1);
+xlabel('Time step');
+ylabel('Distance (in m)');
+title('OSPA Evaluation');
 
 %% 
