@@ -3,7 +3,8 @@
 % Object numbers: 1
 % Transition noise, measurement noise: Gauss
 % False Alarm: 0
-% Measurements per time step: 2
+% Measurements per time step: 1
+% Object start from [0,0] to [20,30] in 10 time steps (10 seconds)
 
 clc, clear, close all;
 %% Simulation setting
@@ -20,17 +21,17 @@ end
 
 %% Generate measurement
 for i = 1:duration
-    z{i} = repmat(model.H * gt(:, i),1,1) + mvnrnd(0,1,2,1);
+    z{i} = repmat(model.H * gt(:, i),1,1) + 1/1.5*mvnrnd(0,1,2,1);
 end
 
 %% Prior
 % Kalman
-KM_m_update{1}(:, 1) = [0; 0; 10; 10];
+KM_m_update{1}(:, 1) = [0; 10; 10; 10];
 KM_P_update{1}(:, :, 1) = diag([100 100 100 100]).^2;
 
 % GM-PHD
 w_update{1} = [0.5];
-m_update{1}(:, 1) = [0; 0; 10; 10];
+m_update{1}(:, 1) = [0; 10; 10; 10];
 P_update{1}(:, :, 1) = diag([100 100 100 100]).^2;
 % D{1} = gmdistribution(m_update{1}, P_update{1}, w_update{1});
 L_update = 1;
@@ -130,45 +131,35 @@ end
 
 
 %% Plot and visualize
-figure(1);
-subplot(211);
+figure(1); 
 hold on;
 for t = 1:duration
-    if ~isempty(est{t})
-        plot(t,est{t}(1,:),'kx');
-    end
-    plot(t,gt(1,t),'b.');
-end
-ylabel('X coordinate (in m)');
-xlabel('time step');
-
-subplot(212);
-hold on;
-for t = 1:duration
-    if ~isempty(est{t})
-        plot(t,est{t}(2,:),'kx');
-    end
-    plot(t,gt(2,t),'b.');
-end
-ylabel('Y coordinate (in m)');
-xlabel('time step');
-
-
-figure(2); 
-hold on;
-for t = 2:duration
     for k = 1:num_objects(t)
-        est_plot = plot(est{t}(1, k), est{t}(2, k), 'b*');
+        est_plot = plot(est{t}(1, k), est{t}(2, k), 'b*','MarkerSize',10);
+        KM_plot = plot(KM_m_update{t}(1, 1), KM_m_update{t}(2, 1), 'go','MarkerSize',10);
     end
     meas_plot = plot(z{t}(1, :), z{t}(2, :), 'k.');
-    KM_plot = plot(KM_m_update{t}(1, 1), KM_m_update{t}(2, 1), 'go');
 end
-gt_plot = plot(gt(1,:),gt(2,:));
+gt_plot = plot(gt(1,:),gt(2,:),'-r.','LineWidth',1.5,'MarkerSize',15);
+xlim([-2 22]);
+ylim([-2 32]);
 xlabel('Position X');
 ylabel('Position Y');
 title('Tracking Estimation');
 legend([est_plot, KM_plot, gt_plot, meas_plot],'GM-PHD','Kalman Filter','Ground-truth', 'Measurement', 'Location','southeast');
-%legend([est_plot],'Estimations','Location','northeast');
+
+figure(2); 
+hold on;
+for t = 1:duration
+    meas_plot = plot(z{t}(1, :), z{t}(2, :), 'k.','MarkerSize',15);
+end
+gt_plot = plot(gt(1,:),gt(2,:),'-r.','LineWidth',1.5,'MarkerSize',15);
+xlim([-2 22]);
+ylim([-2 32]);
+xlabel('Position X');
+ylabel('Position Y');
+title('Sensor FOV');
+legend([gt_plot, meas_plot],'Ground-truth', 'Measurement', 'Location','southeast');
 
 %% Evaluation
 figure(3);
@@ -183,8 +174,8 @@ for t = 1:duration
     end
 end
 hold on;
-ospa_KF = plot(1:duration, ospa1 , 'b');
-ospa_PHD = plot(1:duration, ospa2, 'r');
+ospa_KF = plot(1:duration, ospa1 , 'g','LineWidth',1.5);
+ospa_PHD = plot(1:duration, ospa2, 'b','LineWidth',1.5);
 xlabel('Time step');
 ylabel('Distance');
 title('OSPA Evaluation')
