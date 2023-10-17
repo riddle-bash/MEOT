@@ -11,6 +11,7 @@ model = gen_model;
 %% Ground-truth, noise setting
 
 gt1(:,1) = [0; 0; 20; 30];
+gt1_shape = [56.3/180 * pi; 2 * model.carSize];
 
 for i = 2:duration
     gt1(:,i) = model.F * gt1(:,i-1);
@@ -46,6 +47,7 @@ P_update{1} = diag([100 100 20 30]);
 
 est = cell(1, duration);
 num_targets = zeros(1, duration);
+exec_time = zeros(1, duration);
 
 elim_threshold = 1e-5;
 merge_threshold = 4;
@@ -67,6 +69,7 @@ Cwr = diag([10 10 1 1]);
 Cwp = diag([.05 .001 .001]);
 
 for k = 2:duration
+    execution = tic;
 %% Predict
     w_birth = .01;
     m_birth = [0; 0; 20; 20];
@@ -117,11 +120,20 @@ for k = 2:duration
         est{k} = [est{k} m_update{k}(1:2, i)];
     end
 
+    d_threshold = 50;
+    est{k} = partition_labeling(d_threshold, est{k});
+    num_targets(k) = size(est{k}, 2);
+
     [r(:,k), p(:,k), Cr, Cp] = measurement_update(est{k}, H, r(:,k), p(:,k), Cr, Cp, Ch, Cv);
     
     [r(:,k+1), p(:,k+1), Cr, Cp] = time_update(r(:,k), p(:,k), Cr, Cp, Ar, Ap, Cwr, Cwp);
+    
+    exec_time(k) = toc(execution);
 
-    disp(['Time step: ', num2str(k)]);
+    disp(['Time step ', num2str(k), ...
+        ': measurements = ', num2str(size(z{k}, 2)), ...
+        ', estimations = ', num2str(num_targets(k)), ...
+        ', execution time = ', num2str(exec_time(k)) , 's']);
 
 end
 
@@ -166,7 +178,7 @@ hold on;
 for t = 1:duration
     if mod(t, 2) == 0
         gt_center_plot = plot(gt1(1,t), gt1(2,t), 'r.');
-        gt_plot = plot_extent([gt1(1:2,t); 33.7/180 * pi; 10; 4], '-', 'r', 1);
+        gt_plot = plot_extent([gt1(1:2,t); gt1_shape], '-', 'r', 1);
 
         est_center_plot = plot(r(1,t), r(2,t), 'b+');
         est_plot = plot_extent([r(1:2,t); p(:,t)], '-', 'b', 1);
@@ -181,3 +193,25 @@ title('Extended GM-PHD Estimation');
 legend([gt_plot, est_plot], 'Ground-truth', 'Estimation', 'Location', 'southeast');
 
 %% Evaluation
+doPlotOSPA = false;
+disp(['--------------------Total run time: ', num2str(sum(exec_time, 2)), 's--------------------']);
+
+if doPlotOSPA
+    ospa = zeros(1, duration);
+    ospa_cutoff = 50;
+    ospa_order = 1;
+    
+    for t = 2:duration
+        [gt_mat, est_mat] = get_uniform_points_boundary([gt1(1:2,t); gt1_shape]', [r(1:2,t); p(:,t)]', 50);
+        ospa(t) = ospa_dist(gt_mat, est_mat, ospa_cutoff, ospa_order);
+    end
+
+    figure (4);
+    hold on;
+    
+    plot(2:duration, ospa(2:end));
+
+    xlabel('Time step');
+    ylabel('Distance (in m)');
+    title('OSPA Evaluation');
+end
