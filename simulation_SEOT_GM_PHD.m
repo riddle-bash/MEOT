@@ -19,9 +19,12 @@ end
 
 %% Generate measurement
 
-z = cell(duration,1);
-num_z = 3;
-num_c = 50;
+z = cell(duration, 1);
+c = cell(duration, 1);
+num_z = zeros(duration, 1);
+num_c = zeros(duration, 1);
+lambda_z = 5;
+lambda_c = 50;
 noise_amp = 5;
 
 clutter_region = [gt1(1,1) - 10, gt1(1,end) + 10;
@@ -29,11 +32,28 @@ clutter_region = [gt1(1,1) - 10, gt1(1,end) + 10;
 pdf_c = 1/prod(clutter_region(:,2) - clutter_region(:,1));
 
 for i = 1:duration
-    z1 = repmat(gt1(1:2,i),1,num_z) + noise_amp * mvnrnd([0;0], [1 0; 0 1], num_z)';
-    
-    c(:, :, i) = [unifrnd(clutter_region(1,1),clutter_region(1,2),1,num_c); unifrnd(clutter_region(2,1),clutter_region(2,2),1,num_c)];
+    num_z(i) = poissrnd(lambda_z);
+    z1 = zeros(2, num_z(i));
+    for j = 1:num_z(i)
+        h(j, :) = -1 + 2.* rand(1, 2);
+        while norm(h(j, :)) < 1
+            h(j, :) = -1 + 2.* rand(1,2);
+        end
 
-    z{i} = [z1 c(:, :, i)];
+        if rand(1) <= model.P_D
+        end
+
+        z1(:, j) = gt1(1:2, i) + ...
+            h(j, 1) * gt1_shape(2) * [cos(gt1_shape(1)); sin(gt1_shape(1))] + ...
+            h(j, 2) * gt1_shape(3) * [-sin(gt1_shape(1)); cos(gt1_shape(1))] + ...
+            noise_amp * mvnrnd([0; 0], [1 0; 0 1], 1)';
+            
+    end
+    
+    num_c(i) = poissrnd(lambda_c);
+    c{i} = [unifrnd(clutter_region(1,1),clutter_region(1,2),1,num_c(i)); unifrnd(clutter_region(2,1),clutter_region(2,2),1,num_c(i))];
+
+    z{i} = [z1 c{i}];
 end
 
 %% Prior
@@ -52,6 +72,7 @@ exec_time = zeros(1, duration);
 elim_threshold = 1e-5;
 merge_threshold = 4;
 L_max = 100;
+d_threshold = 50;
 
 r = repmat(m_update{1}, 1, duration);
 p = repmat([pi/4 10 4]', 1, duration);
@@ -61,7 +82,6 @@ Cp = diag([pi/9 .3 .1]);
 H = [1 0 0 0; 0 1 0 0];
 Ar = model.F;
 Ap = eye(3);
-
 
 Ch = diag([1/4 1/4]);
 Cv = diag([20 8]);
@@ -94,7 +114,7 @@ for k = 2:duration
         
         for i = 1:size(z{k}, 2)
             w_temp = model.P_D * w_predict .* likelihood_tmp(:,i);
-            w_temp = w_temp ./ (num_c * pdf_c + sum(w_temp));
+            w_temp = w_temp ./ (num_c(k) * pdf_c + sum(w_temp));
 
             w_update{k} = cat(1, w_update{k}, w_temp);
             m_update{k} = cat(2, m_update{k}, m_temp(:,:,i));
@@ -120,7 +140,6 @@ for k = 2:duration
         est{k} = [est{k} m_update{k}(1:2, i)];
     end
 
-    d_threshold = 50;
     est{k} = partition_labeling(d_threshold, est{k});
     num_targets(k) = size(est{k}, 2);
 
@@ -133,6 +152,8 @@ for k = 2:duration
     disp(['Time step ', num2str(k), ...
         ': measurements = ', num2str(size(z{k}, 2)), ...
         ', estimations = ', num2str(num_targets(k)), ...
+        ', reflection points = ', num2str(num_z(k)), ...
+        ', clutters = ', num2str(num_c(k)), ...
         ', execution time = ', num2str(exec_time(k)) , 's']);
 
 end
@@ -162,7 +183,7 @@ for t = 1:duration
         est_plot = plot(est{t}(1, k), est{t}(2, k), 'b*');
     end
 
-    c_plot = plot(c(1, :, t), c(2, :, t), 'k.', 'MarkerSize', 1);
+    c_plot = plot(c{t}(1, :), c{t}(2, :), 'k.', 'MarkerSize', 1);
 end
 
 xlim([clutter_region(1,1) clutter_region(1,2)]);
@@ -193,8 +214,8 @@ title('Extended GM-PHD Estimation');
 legend([gt_plot, est_plot], 'Ground-truth', 'Estimation', 'Location', 'southeast');
 
 %% Evaluation
-doPlotOSPA = false;
-disp(['--------------------Total run time: ', num2str(sum(exec_time, 2)), 's--------------------']);
+doPlotOSPA = true;
+disp(['------------------------------Total run time: ', num2str(sum(exec_time, 2)), 's---------------------------']);
 
 if doPlotOSPA
     ospa = zeros(1, duration);
