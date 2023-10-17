@@ -58,3 +58,7 @@ model.P_MD= 1-model.P_D; % probability of missed detection in measurements
 model.lambda_c = 50; % clutter rate
 model.range_c= [-1000 1000; -1000 1000];      % uniform clutter region
 model.pdf_c= 1/prod(model.range_c(:,2)-model.range_c(:,1)); % uniform clutter density
+
+% Extended Parameters
+model.carSize = [4.85; 1.85];
+model.truckSize = [15; 3];
