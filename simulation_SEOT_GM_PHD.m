@@ -132,7 +132,9 @@ for k = 2:duration
 
     for i = 1:num_targets(k)
         [~, maxIndex] = max(w_copy);
-        indices(i) = maxIndex;
+        if w_copy(maxIndex) > 0.5
+            indices(i) = maxIndex;
+        end
         w_copy(maxIndex) = -inf;
     end
 
@@ -197,7 +199,7 @@ figure (3);
 hold on;
 
 for t = 1:duration
-    if mod(t, 2) == 0
+    if mod(t, 1) == 0
         gt_center_plot = plot(gt1(1,t), gt1(2,t), 'r.');
         gt_plot = plot_extent([gt1(1:2,t); gt1_shape], '-', 'r', 1);
 
@@ -214,7 +216,7 @@ title('Extended GM-PHD Estimation');
 legend([gt_plot, est_plot], 'Ground-truth', 'Estimation', 'Location', 'southeast');
 
 %% Evaluation
-doPlotOSPA = true;
+doPlotOSPA = false;
 disp(['------------------------------Total run time: ', num2str(sum(exec_time, 2)), 's---------------------------']);
 
 if doPlotOSPA
