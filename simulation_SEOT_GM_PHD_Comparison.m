@@ -43,7 +43,8 @@ duration = multi_simu_dur;
 scenarioID = custom_scenario;
 
 %% Ground-truth and noise setting
-[gt_dynamic, gt_orient] = ground_truth_generate(scenarioID, duration, model.F, true);
+isGroundtruthNoisy = true;
+[gt_dynamic, gt_orient] = ground_truth_generate(scenarioID, duration, model.F, isGroundtruthNoisy);
 gt_shape = [gt_orient; repmat(model.carSize, 1, duration)];
 
 %% Measurements setting
@@ -52,8 +53,8 @@ lambda_c = 50;
 noise_amp = 1;
 detection_probability = 0.9;
 
-clutter_region = [gt_dynamic(1, 1) - 10  gt_dynamic(1, end) + 10;
-                    gt_dynamic(2, 1) - 10 gt_dynamic(2, end) + 10];
+clutter_region = [min(gt_dynamic(1, :)) - 10,  max(gt_dynamic(1, :)) + 10;
+                    min(gt_dynamic(2, :)) - 10, max(gt_dynamic(2, :)) + 10];
 pdf_c = 1/prod(clutter_region(:, 2) - clutter_region(:, 1));
                 
 %% Tolerance setting
