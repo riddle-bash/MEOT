@@ -30,37 +30,27 @@
 
 clc, clear, close all
 %% Multi-simulation setting
-multi_num_loop = 10;
+multi_num_loop = 20;
 multi_simu_dur = 100;
 
 custom_scenario = 1;
 
 doPlotOSPA = true;
 doPlotAverageOSPA = true;
-doPlot_SensorFOV = false; 
-doPlot_Estimation = false;
-doPlot_ExtendedEstimation = false;
-
-doPlotExtended_SensorFOV = true;
-doPlotExtended_Estimation = true;
 
 model = gen_model;
 duration = multi_simu_dur;
 scenarioID = custom_scenario;
 
 %% Ground-truth and noise setting
-[gt_dynamic, gt_orient] = ground_truth_generate(scenarioID, duration, model.F, false);
+[gt_dynamic, gt_orient] = ground_truth_generate(scenarioID, duration, model.F, true);
 gt_shape = [gt_orient; repmat(model.carSize, 1, duration)];
 
 %% Measurements setting
-z = cell(duration, 1);
-c = cell(duration, 1);
-num_z = zeros(duration, 1);
-num_c = zeros(duration, 1);
 lambda_z = 5;
 lambda_c = 50;
 noise_amp = 1;
-detection_probability = 1;
+detection_probability = 0.9;
 
 clutter_region = [gt_dynamic(1, 1) - 10  gt_dynamic(1, end) + 10;
                     gt_dynamic(2, 1) - 10 gt_dynamic(2, end) + 10];
@@ -109,9 +99,15 @@ for i_loop = 1:multi_num_loop
     Cwp = diag([.05 .001 .001]);
 
 %% Generate measurements
+    z = cell(duration, 1);
+    c = cell(duration, 1);
+    num_z = zeros(duration, 1);
+    num_c = zeros(duration, 1);
+    num_detections = zeros(duration, 1);
+
     for i = 1:duration
         num_z(i) = 1 + poissrnd(lambda_z);
-        reflection_points = zeros(2, 1);
+        reflection_points = [];
         h = zeros(num_z(i), 2);
         for j = 1:num_z(i)
             h(j, :) = -1 + 2.* rand(1, 2);
@@ -121,12 +117,13 @@ for i_loop = 1:multi_num_loop
             end
     
             if rand(1) <= detection_probability
-                reflection_points(:, j) = gt_dynamic(1:2, i) + ...
+                reflection_points(:, end + 1) = gt_dynamic(1:2, i) + ...
                                         h(j, 1) * gt_shape(2, i) * [cos(gt_shape(1, i)); sin(gt_shape(1, i))] + ...
                                         h(j, 2) * gt_shape(3, i) * [-sin(gt_shape(1, i)); cos(gt_shape(1, i))] + ...
                                         noise_amp * mvnrnd([0; 0], [1 0; 0 1], 1)';
             end
         end
+        num_detections(i) = size(reflection_points, 2);
     
         num_c(i) = poissrnd(lambda_c);
         clutters = [unifrnd(clutter_region(1, 1), clutter_region(1, 2), 1, num_c(i));
@@ -214,6 +211,12 @@ for i_loop = 1:multi_num_loop
         for i = 1:duration
             [est_mat, gt_mat] = get_uniform_points_boundary([r(1:2, i); p(:, i)]', [gt_dynamic(1:2, i); gt_shape(:, i)]', 50);
             single_ospa(i) = ospa_dist(est_mat, gt_mat, ospa_cutoff, ospa_order);
+
+            if single_ospa(i) == 50
+                disp('est'); disp(est{i});
+                disp('z'); disp(z{i});
+                disp('clutter'); disp(c{i});
+            end
         end
         
         figure(1);
