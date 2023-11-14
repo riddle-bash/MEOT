@@ -44,10 +44,10 @@ for i_loop = 1:multi_num_loop
             m_update{1}(:, 2) = [100; 500; 15; -20];
             P_update{1}(:, :, 2) = diag([100 100 20 30]);
         case 2
-            m_update{1}(:, 1) = [100; 0; 10; 20];
+            m_update{1}(:, 1) = [100; 100; 10; 20];
             P_update{1}(:, :, 1) = diag([100 100 20 30]);
             
-            m_update{1}(:, 2) = [450; 500; -10; -20];
+            m_update{1}(:, 2) = [300; 300; -10; -20];
             P_update{1}(:, :, 2) = diag([100 100 20 30]);
     end
     
@@ -236,6 +236,8 @@ for i_loop = 1:multi_num_loop
     
         % Sort Meas, r
         [ET_meas{k}, r{k}, p{k}] = assignment(ET_meas{k}, r{k}, p{k}, num_targets(k));
+        est_extend{k} = {};
+        gt_extend{k} = {};
         
         for i = 1:num_targets(k)
             Meas = ET_meas{k}{i};
@@ -249,8 +251,16 @@ for i_loop = 1:multi_num_loop
                 Cr(:, :, i), Cp(:, :, i), Ch, Cv);
     
             [p{k+1}(:, i), Cp(:, :, i)] = shape_predict(p{k}(:, i), Cp(:, :, i), Ap, Cwp);
+            est_extend{k}{i} = [r{k}(1:2, i); p{k}(:, i)];
         end
     
+        if k >= model.t_birth
+            gt_extend{k} = {[model.gt1(1:2, k); model.gt1_shape] [model.gt2(1:2, k); model.gt2_shape] ...
+                [model.gt3(1:2, k); model.p_birth]};
+        else
+            gt_extend{k} = {[model.gt1(1:2, k); model.gt1_shape] [model.gt2(1:2, k); model.gt2_shape]};
+        end
+
         result_extend{k}.r = r{k};
         result_extend{k}.p = p{k};
         result_extend{k}.meas = ET_meas{k};
@@ -282,28 +292,23 @@ for i_loop = 1:multi_num_loop
         doPlotOSPA_extend = true;
         
         if doPlotOSPA_extend
-            if k >= model.t_birth
-                extend{i_loop}.gt{k} = {[model.gt1(1:2, k); model.gt1_shape]'; [model.gt2(1:2, k); model.gt2_shape]'; ...
-                    [model.gt3(1:2, k); model.p_birth]'};
+            extend{i_loop}.ospa(k) = 0;
+            % Optimal assignment between estimate and groundtruth
+            if num_targets(k) ~= 0
+                [est_extend{k}, gt_extend{k}, dim] = est_assignment(est_extend{k}, gt_extend{k});
+                for i = 1:dim
+                    if isempty(gt_extend{k}{i}) || isempty(est_extend{k}{i})
+                        extend{i_loop}.ospa(k) = extend{i_loop}.ospa(k) + extend{i_loop}.ospa_cutoff;
+                    else
+                        [gt_mat_tmp, est_mat_tmp] = get_uniform_points_boundary(gt_extend{k}{i}', est_extend{k}{i}', 50);
+                        extend{i_loop}.ospa(k) = extend{i_loop}.ospa(k) + ...
+                            ospa_dist(gt_mat_tmp, est_mat_tmp, extend{i_loop}.ospa_cutoff, extend{i_loop}.ospa_order);
+                    end
+                end
+                extend{i_loop}.ospa(k) = extend{i_loop}.ospa(k) / num_targets(k);
             else
-                extend{i_loop}.gt{k} = {[model.gt1(1:2, k); model.gt1_shape]'; [model.gt2(1:2, k); model.gt2_shape]'};
+                extend{i_loop}.ospa(k) = extend{i_loop}.ospa_cutoff;
             end
-            for i = 1:num_targets(k)
-                if i > size(extend{i_loop}.gt{k}, 1)
-                    extend{i_loop}.gt{k}{end + 1} = [];
-                end
-                if i > size(r{k}, 2)
-                    extend{i_loop}.est{i} = [];
-                else
-                    extend{i_loop}.est{i} = [r{k}(1:2,i); p{k}(:,i)]';
-                end
-                [gt_mat_tmp, est_mat_tmp] = get_uniform_points_boundary(extend{i_loop}.gt{k}{i}, ...
-                    extend{i_loop}.est{i}, 50);
-                extend{i_loop}.gt_mat{k} = [extend{i_loop}.gt_mat{k}, gt_mat_tmp];
-                extend{i_loop}.est_mat{k} = [extend{i_loop}.est_mat{k}, est_mat_tmp];
-            end
-            extend{i_loop}.ospa(k) = ospa_dist(extend{i_loop}.gt_mat{k}, extend{i_loop}.est_mat{k}, ...
-                extend{i_loop}.ospa_cutoff, extend{i_loop}.ospa_order);
         end
     end
     disp(['------------------------------Total run time: ', num2str(sum(exec_time, 2)), 's---------------------------']);
@@ -334,52 +339,52 @@ xlabel('Time step');
 ylabel('Distance (in m)');
 title('OSPA Evaluation of Extended Target');
 
-figure;
-hold on
-gt_plot = plot([model.gt1(1,:), NaN, model.gt2(1,:)], [model.gt1(2,:), NaN, model.gt2(2,:)], '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
-birth_plot = plot(model.gt3(1, model.t_birth:model.duration), ...
-        model.gt3(2, model.t_birth:model.duration), '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
-for t = 1:model.duration
-    
-    for k = 1:num_targets(t)
-        est_plot = plot(est_m{t}(1, k), est_m{t}(2, k), 'b*');
-    end
-
-    meas_plot = plot(model.z{t}(1,:), model.z{t}(2,:), 'k.', 'MarkerSize', 1);
-end
-
-xlim([model.range_c(1,1) model.range_c(1,2)]+10);
-ylim([model.range_c(2,1) model.range_c(2,2)+10]);
-xlabel('Position X');
-ylabel('Position Y');
-title('GM-PHD Estimation');
-legend([gt_plot, birth_plot, est_plot, meas_plot], 'Ground-truth', 'Birth', 'Estimation', 'Measurement', 'Location', 'bestoutside');
-
-figure (3);
-hold on;
-
-for t = 1:duration
-    if mod(t, 1) == 0
-        gt_center_plot1 = plot(model.gt1(1,t), model.gt1(2,t), 'r.');
-        gt_center_plot2 = plot(model.gt2(1,t), model.gt2(2,t), 'r.');
-        gt_plot1 = plot_extent([model.gt1(1:2,t); model.gt1_shape], '-', 'r', 1);
-        gt_plot2 = plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);
-        if t >= model.t_birth
-            gt_center_plot3 = plot(model.gt3(1,t), model.gt3(2,t), 'r.');
-            gt_plot3 = plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'y', 1);
-        end
-
-        for n = 1 : num_targets(t)
-           est_center_plot = plot(r{t}(1, n), r{t}(2, n), 'b+');
-           est_plot = plot_extent([r{t}(1:2, n); p{t}(:, n)], '-', 'b', 1);
-           meas_plot = plot(result_extend{t}.meas{n}(1, :), result_extend{t}.meas{n}(2, :), 'k^');
-        end
-    end
-end
-
-xlim([model.range_c(1,1) 600]);
-ylim([model.range_c(2,1) 600]);
-xlabel('Position X');
-ylabel('Position Y');
-title('Extended GM-PHD Estimation');
-legend([gt_plot1, gt_plot2, gt_plot3, est_plot], 'Ground-truth 1', 'Ground-truth 2', 'Birth', 'Estimation', 'Location', 'southeast');
+% figure;
+% hold on
+% gt_plot = plot([model.gt1(1,:), NaN, model.gt2(1,:)], [model.gt1(2,:), NaN, model.gt2(2,:)], '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
+% birth_plot = plot(model.gt3(1, model.t_birth:model.duration), ...
+%         model.gt3(2, model.t_birth:model.duration), '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
+% for t = 1:model.duration
+%     
+%     for k = 1:num_targets(t)
+%         est_plot = plot(est_m{t}(1, k), est_m{t}(2, k), 'b*');
+%     end
+% 
+%     meas_plot = plot(model.z{t}(1,:), model.z{t}(2,:), 'k.', 'MarkerSize', 1);
+% end
+% 
+% xlim([model.range_c(1,1) model.range_c(1,2)]+10);
+% ylim([model.range_c(2,1) model.range_c(2,2)+10]);
+% xlabel('Position X');
+% ylabel('Position Y');
+% title('GM-PHD Estimation');
+% legend([gt_plot, birth_plot, est_plot, meas_plot], 'Ground-truth', 'Birth', 'Estimation', 'Measurement', 'Location', 'bestoutside');
+% 
+% figure (3);
+% hold on;
+% 
+% for t = 1:duration
+%     if mod(t, 1) == 0
+%         gt_center_plot1 = plot(model.gt1(1,t), model.gt1(2,t), 'r.');
+%         gt_center_plot2 = plot(model.gt2(1,t), model.gt2(2,t), 'r.');
+%         gt_plot1 = plot_extent([model.gt1(1:2,t); model.gt1_shape], '-', 'r', 1);
+%         gt_plot2 = plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);
+%         if t >= model.t_birth
+%             gt_center_plot3 = plot(model.gt3(1,t), model.gt3(2,t), 'r.');
+%             gt_plot3 = plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'y', 1);
+%         end
+% 
+%         for n = 1 : num_targets(t)
+%            est_center_plot = plot(r{t}(1, n), r{t}(2, n), 'b+');
+%            est_plot = plot_extent([r{t}(1:2, n); p{t}(:, n)], '-', 'b', 1);
+%            meas_plot = plot(result_extend{t}.meas{n}(1, :), result_extend{t}.meas{n}(2, :), 'k^');
+%         end
+%     end
+% end
+% 
+% xlim([model.range_c(1,1) 600]);
+% ylim([model.range_c(2,1) 600]);
+% xlabel('Position X');
+% ylabel('Position Y');
+% title('Extended GM-PHD Estimation');
+% legend([gt_plot1, gt_plot2, gt_plot3, est_plot], 'Ground-truth 1', 'Ground-truth 2', 'Birth', 'Estimation', 'Location', 'southeast');

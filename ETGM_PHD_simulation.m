@@ -234,10 +234,10 @@ for k = 1:duration
     end
 
     if k >= model.t_birth
-        gt_extend{k} = {[model.gt1(1:2, k); model.gt1_shape]'; [model.gt2(1:2, k); model.gt2_shape]'; ...
-            [model.gt3(1:2, k); model.p_birth]'};
+        gt_extend{k} = {[model.gt1(1:2, k); model.gt1_shape] [model.gt2(1:2, k); model.gt2_shape] ...
+            [model.gt3(1:2, k); model.p_birth]};
     else
-        gt_extend{k} = {[model.gt1(1:2, k); model.gt1_shape]'; [model.gt2(1:2, k); model.gt2_shape]'};
+        gt_extend{k} = {[model.gt1(1:2, k); model.gt1_shape] [model.gt2(1:2, k); model.gt2_shape]};
     end
 
     result_extend{k}.r = r{k};
@@ -346,14 +346,18 @@ if doPlotOSPA_extend
     gt_mat = cell(1, duration);
     est_mat = cell(1, duration);
     for t = 1:duration
+        ospa(t) = 0;
         % Optimal assignment between estimate and groundtruth
-        [est_extend{t}, gt_extend{t}] = est_assignment(est_extend{t}, gt_extend{t});
-        for i = 1:num_targets(t)
-            [gt_mat_tmp, est_mat_tmp] = get_uniform_points_boundary(gt_extend{t}{i}, est_extend{t}{i}, 50);
-            gt_mat{t} = [gt_mat{t}, gt_mat_tmp];
-            est_mat{t} = [est_mat{t}, est_mat_tmp];
+        [est_extend{t}, gt_extend{t}, dim] = est_assignment(est_extend{t}, gt_extend{t});
+        for i = 1:dim
+            if isempty(gt_extend{t}{i}) || isempty(est_extend{t}{i})
+                ospa(t) = ospa(t) + ospa_cutoff;
+            else
+                [gt_mat_tmp, est_mat_tmp] = get_uniform_points_boundary(gt_extend{t}{i}', est_extend{t}{i}', 50);
+                ospa(t) = ospa(t) + ospa_dist(gt_mat_tmp, est_mat_tmp, ospa_cutoff, ospa_order);
+            end
         end
-        ospa(t) = ospa_dist(gt_mat{t}, est_mat{t}, ospa_cutoff, ospa_order);
+        ospa(t) = ospa(t) / num_targets(t);
     end
 
     figure (4);

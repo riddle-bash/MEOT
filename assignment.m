@@ -9,6 +9,7 @@ function [Meas_tmp, est_m, p] = assignment(Meas, est_m, p, num_target)
     n = size(Meas, 2);
     m = size(est_m, 2);
     assign_tmp = zeros(n, m);
+    Meas_tmp = {};
     for i = 1:n
         for j = 1:m
             % Calculate distance from est_m to cell W
