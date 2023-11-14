@@ -10,11 +10,11 @@
 clc, clear, close all;
 
 %% Multi-simulation
-multi_num_loop = 20;
+multi_num_loop = 10;
 mean_kinematic_ospa = zeros(1, 20);
 mean_extend_ospa = zeros(1, 20);
 for i_loop = 1:multi_num_loop
-    disp(['----------------------Loop steps: ', num2str(i_loop) , '----------------------------']);
+    disp(['------------------------------Loop steps: ', num2str(i_loop) , '---------------------------']);
     %% Simulation setting
     mode = 2;      % Num of Scenario
     model = gen_model(mode);
