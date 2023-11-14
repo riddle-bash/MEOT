@@ -347,17 +347,21 @@ if doPlotOSPA_extend
     est_mat = cell(1, duration);
     for t = 1:duration
         ospa(t) = 0;
-        % Optimal assignment between estimate and groundtruth
-        [est_extend{t}, gt_extend{t}, dim] = est_assignment(est_extend{t}, gt_extend{t});
-        for i = 1:dim
-            if isempty(gt_extend{t}{i}) || isempty(est_extend{t}{i})
-                ospa(t) = ospa(t) + ospa_cutoff;
-            else
-                [gt_mat_tmp, est_mat_tmp] = get_uniform_points_boundary(gt_extend{t}{i}', est_extend{t}{i}', 50);
-                ospa(t) = ospa(t) + ospa_dist(gt_mat_tmp, est_mat_tmp, ospa_cutoff, ospa_order);
+        if num_targets(k) ~= 0
+            % Optimal assignment between estimate and groundtruth
+            [est_extend{t}, gt_extend{t}, dim] = est_assignment(est_extend{t}, gt_extend{t});
+            for i = 1:dim
+                if isempty(gt_extend{t}{i}) || isempty(est_extend{t}{i})
+                    ospa(t) = ospa(t) + ospa_cutoff;
+                else
+                    [gt_mat_tmp, est_mat_tmp] = get_uniform_points_boundary(gt_extend{t}{i}', est_extend{t}{i}', 50);
+                    ospa(t) = ospa(t) + ospa_dist(gt_mat_tmp, est_mat_tmp, ospa_cutoff, ospa_order);
+                end
             end
+            ospa(t) = ospa(t) / num_targets(t);
+        else
+            ospa(t) = ospa_cutoff;
         end
-        ospa(t) = ospa(t) / num_targets(t);
     end
 
     figure (4);

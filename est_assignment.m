@@ -1,12 +1,19 @@
 function [est_m, gt, dim] = est_assignment(est_m, gt)
-    m = size(gt, 2);
-    n = size(est_m, 2);
+% Optimal assignment the set of estimation and ground-truth
+% Algorithm:
+% 1. Calculate distance between gt and est then save to a vector (m x n)
+% 2. Find gt that match est by choose the minimun distance
+% 3. dim is max(m, n) Assign gt{dim} or est{dim} is empty for better check
+% later
+    m = size(gt, 2);            % num of ground-truth
+    n = size(est_m, 2);         % num of estimate
     for est_idx = 1:n
         for gt_idx = 1:m
             % Calculate distance from est_m to gt
             assign_tmp(est_idx, gt_idx) = cal_dist(gt{gt_idx}(1:2), est_m{est_idx}(1:2));
         end
     end
+    % In case gt_num is lower than est_num
     if m < n
         dim = n;
         for gt_idx = 1:m
