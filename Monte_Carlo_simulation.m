@@ -10,13 +10,13 @@
 clc, clear, close all;
 
 %% Multi-simulation
-multi_num_loop = 10;
+multi_num_loop = 100;
 mean_kinematic_ospa = zeros(1, 20);
 mean_extend_ospa = zeros(1, 20);
 for i_loop = 1:multi_num_loop
     disp(['------------------------------Loop steps: ', num2str(i_loop) , '---------------------------']);
     %% Simulation setting
-    mode = 2;      % Num of Scenario
+    mode = 1;      % Num of Scenario
     model = gen_model(mode);
     duration = model.duration;
     
@@ -38,10 +38,10 @@ for i_loop = 1:multi_num_loop
     w_update{1} = [.5 ; .5];
     switch mode
         case 1
-            m_update{1}(:, 1) = [100; 0; 20; 20];
+            m_update{1}(:, 1) = [200; 0; 20; 20];
             P_update{1}(:, :, 1) = diag([100 100 20 30]);
             
-            m_update{1}(:, 2) = [100; 500; 15; -20];
+            m_update{1}(:, 2) = [200; 500; 20; -20];
             P_update{1}(:, :, 2) = diag([100 100 20 30]);
         case 2
             m_update{1}(:, 1) = [100; 100; 10; 20];
@@ -66,7 +66,7 @@ for i_loop = 1:multi_num_loop
     r = cell(1, duration);
     p = cell(1, duration);
     r{1} = [m_update{1}(:, 1) m_update{1}(:, 2)];
-    p{1} = repmat([0 model.carSize']', 1, 2);
+    p{1} = repmat([0 1.5*model.carSize']', 1, 2);
     Cr = repmat(diag([10 10 16 16]), 1, 1, 2);
     Cp = repmat(diag([1 .3 .1]), 1, 1, 2);
     
@@ -229,7 +229,7 @@ for i_loop = 1:multi_num_loop
             r{k}(:, i) = est_m{k}(:, i);
             Cr(:, :, i) = est_P{k}(:, :, i);
             if i > size(p{k}, 2)
-                p{k}(:, i) = [0 model.carSize']';
+                p{k}(:, i) = [0 1.5*model.carSize']';
                 Cp(:, :, i) = diag([1 .3 .1]);
             end
         end
@@ -305,7 +305,7 @@ for i_loop = 1:multi_num_loop
                             ospa_dist(gt_mat_tmp, est_mat_tmp, extend{i_loop}.ospa_cutoff, extend{i_loop}.ospa_order);
                     end
                 end
-                extend{i_loop}.ospa(k) = extend{i_loop}.ospa(k) / num_targets(k);
+                extend{i_loop}.ospa(k) = extend{i_loop}.ospa(k) / dim;
             else
                 extend{i_loop}.ospa(k) = extend{i_loop}.ospa_cutoff;
             end

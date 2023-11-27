@@ -9,7 +9,7 @@
 
 clc, clear, close all;
 %% Simulation setting
-mode = 2;      % Num of Scenario
+mode = 1;      % Num of Scenario
 model = gen_model(mode);
 duration = model.duration;
 

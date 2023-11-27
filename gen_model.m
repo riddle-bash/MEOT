@@ -8,10 +8,10 @@ model.truckSize = [15; 3];
 
 switch m
     case 1
-        model.gt1(:,1) = [0; 0; 20; 20];
+        model.gt1(:,1) = [0; 10; 20; 20];
         model.gt1_shape = [56.3/180 * pi; 1 * model.carSize];
 
-        model.gt2(:,1) = [10; 500; 15; -20];
+        model.gt2(:,1) = [10; 450; 20; -20];
         model.gt2_shape = [56.3/180 * pi; 1 * model.carSize];
     case 2
         model.gt1(:,1) = [0; 0; 10; 20];
@@ -152,6 +152,8 @@ if doplot
     birth_plot = plot(model.gt3(1, model.t_birth:model.duration), ...
         model.gt3(2, model.t_birth:model.duration), '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
     for t = 1 : model.duration
+        plot_extent([model.gt1(1:2,t); model.gt1_shape], '-', 'r', 1);
+        plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);
         meas_plot = plot(model.z{t}(1,:), model.z{t}(2,:), 'k+', 'MarkerSize', 5);
         clutter_plot = plot(model.c{t}(1, :), model.c{t}(2, :), 'b*', 'MarkerSize', 5);
     end
