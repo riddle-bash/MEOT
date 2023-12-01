@@ -2,8 +2,8 @@
 % ---Using Gaussian Mixture Probability Hypothesis Density----
 % ------------------------------------------------------------
 % ------------------------------------------------------------
-% Scenario 1: 2 objects meet (m = 1)
-% Scenario 2: 2 objects not meet (m = 2)
+% Scenario 1: 2 objects not meet (m = 1)
+% Scenario 2: 2 objects meet (m = 2)
 % lambda: poisson rate lambda_c
 % gamma: poisson rate to rand measurements of each object num_z
 
@@ -38,16 +38,16 @@ for i_loop = 1:multi_num_loop
     w_update{1} = [.5 ; .5];
     switch mode
         case 1
-            m_update{1}(:, 1) = [200; 0; 20; 20];
+            m_update{1}(:, 1) = [100; 0; 10; 10];
             P_update{1}(:, :, 1) = diag([100 100 20 30]);
-            
-            m_update{1}(:, 2) = [200; 500; 20; -20];
+    
+            m_update{1}(:, 2) = [100; 200; 10; 10];
             P_update{1}(:, :, 2) = diag([100 100 20 30]);
         case 2
-            m_update{1}(:, 1) = [100; 100; 10; 20];
+            m_update{1}(:, 1) = [200; 100; -10; 10];
             P_update{1}(:, :, 1) = diag([100 100 20 30]);
-            
-            m_update{1}(:, 2) = [300; 300; -10; -20];
+    
+            m_update{1}(:, 2) = [100; 200; 10; 10];
             P_update{1}(:, :, 2) = diag([100 100 20 30]);
     end
     
@@ -119,7 +119,6 @@ for i_loop = 1:multi_num_loop
             % Distance partitioning for each Partition P
             P{end + 1} = distance_partitioning(i, Meas);
         end
-    %     P = removeDuplicatePartitions(P);
     
     %% Kinematic update
         %%% Miss detection
@@ -198,7 +197,7 @@ for i_loop = 1:multi_num_loop
         [w_update{k}, m_update{k}, P_update{k}] = gaus_merge(w_update{k}, m_update{k}, P_update{k}, merge_threshold);
         [w_update{k}, m_update{k}, P_update{k}] = gaus_cap(w_update{k}, m_update{k}, P_update{k}, L_max);
     
-        num_targets(k) = floor(sum(w_update{k}));
+        num_targets(k) = round(sum(w_update{k}));
         w_copy = w_update{k};
     
         indices = [];
@@ -321,7 +320,7 @@ mean_kinematic_ospa = mean_kinematic_ospa / multi_num_loop;
 mean_extend_ospa = mean_extend_ospa / multi_num_loop;
 figure(1);
 hold on;
-plot(1:duration, mean_kinematic_ospa(1:end));
+ospa_kin_plot = plot(1:duration, mean_kinematic_ospa(1:end));
 
 ylim([0 200]);
 xlim([1 duration]);
@@ -331,60 +330,11 @@ title('OSPA Evaluation of Kinematic');
 
 figure (2);
 hold on;
-plot(1:duration, mean_extend_ospa(1:end));
+ospa_ext_plot = plot(1:duration, mean_extend_ospa(1:end));
 
 ylim([0 200]);
 xlim([1 duration]);
 xlabel('Time step');
 ylabel('Distance (in m)');
 title('OSPA Evaluation of Extended Target');
-
-% figure;
-% hold on
-% gt_plot = plot([model.gt1(1,:), NaN, model.gt2(1,:)], [model.gt1(2,:), NaN, model.gt2(2,:)], '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
-% birth_plot = plot(model.gt3(1, model.t_birth:model.duration), ...
-%         model.gt3(2, model.t_birth:model.duration), '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
-% for t = 1:model.duration
-%     
-%     for k = 1:num_targets(t)
-%         est_plot = plot(est_m{t}(1, k), est_m{t}(2, k), 'b*');
-%     end
-% 
-%     meas_plot = plot(model.z{t}(1,:), model.z{t}(2,:), 'k.', 'MarkerSize', 1);
-% end
-% 
-% xlim([model.range_c(1,1) model.range_c(1,2)]+10);
-% ylim([model.range_c(2,1) model.range_c(2,2)+10]);
-% xlabel('Position X');
-% ylabel('Position Y');
-% title('GM-PHD Estimation');
-% legend([gt_plot, birth_plot, est_plot, meas_plot], 'Ground-truth', 'Birth', 'Estimation', 'Measurement', 'Location', 'bestoutside');
-% 
-% figure (3);
-% hold on;
-% 
-% for t = 1:duration
-%     if mod(t, 1) == 0
-%         gt_center_plot1 = plot(model.gt1(1,t), model.gt1(2,t), 'r.');
-%         gt_center_plot2 = plot(model.gt2(1,t), model.gt2(2,t), 'r.');
-%         gt_plot1 = plot_extent([model.gt1(1:2,t); model.gt1_shape], '-', 'r', 1);
-%         gt_plot2 = plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);
-%         if t >= model.t_birth
-%             gt_center_plot3 = plot(model.gt3(1,t), model.gt3(2,t), 'r.');
-%             gt_plot3 = plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'y', 1);
-%         end
-% 
-%         for n = 1 : num_targets(t)
-%            est_center_plot = plot(r{t}(1, n), r{t}(2, n), 'b+');
-%            est_plot = plot_extent([r{t}(1:2, n); p{t}(:, n)], '-', 'b', 1);
-%            meas_plot = plot(result_extend{t}.meas{n}(1, :), result_extend{t}.meas{n}(2, :), 'k^');
-%         end
-%     end
-% end
-% 
-% xlim([model.range_c(1,1) 600]);
-% ylim([model.range_c(2,1) 600]);
-% xlabel('Position X');
-% ylabel('Position Y');
-% title('Extended GM-PHD Estimation');
-% legend([gt_plot1, gt_plot2, gt_plot3, est_plot], 'Ground-truth 1', 'Ground-truth 2', 'Birth', 'Estimation', 'Location', 'southeast');
+legend(ospa_ext_plot,'OSPA distance','Location','best');

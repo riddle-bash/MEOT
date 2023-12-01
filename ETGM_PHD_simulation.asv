@@ -10,7 +10,21 @@
 clc, clear, close all;
 %% Simulation setting
 mode = 2;      % Num of Scenario
-model = gen_model(mode);
+if mode == 1
+    if exist('Data/model_scenario1.mat', 'file') == 2
+        loadedData = load('Data/model_scenario1.mat');
+        model = loadedData.model;
+    else
+        model = gen_model(1);
+    end
+elseif mode == 2
+    if exist('Data/model_scenario2.mat', 'file') == 2
+        loadedData = load('Data/model_scenario2.mat');
+        model = loadedData.model;
+    else
+        model = gen_model(2);
+    end
+end
 duration = model.duration;
 
 %% Ground-truth, noise setting
@@ -33,16 +47,16 @@ P_update = cell(1,duration);
 w_update{1} = [.5 ; .5];
 switch mode
     case 1
-        m_update{1}(:, 1) = [100; 0; 20; 20];
+        m_update{1}(:, 1) = [100; 0; 10; 10];
         P_update{1}(:, :, 1) = diag([100 100 20 30]);
 
-        m_update{1}(:, 2) = [100; 500; 15; -20];
+        m_update{1}(:, 2) = [100; 200; 10; 10];
         P_update{1}(:, :, 2) = diag([100 100 20 30]);
     case 2
-        m_update{1}(:, 1) = [100; 100; 10; 20];
+        m_update{1}(:, 1) = [200; 100; -10; 10];
         P_update{1}(:, :, 1) = diag([100 100 20 30]);
 
-        m_update{1}(:, 2) = [300; 500; -10; -20];
+        m_update{1}(:, 2) = [100; 200; 10; 10];
         P_update{1}(:, :, 2) = diag([100 100 20 30]);
 end
 
@@ -99,7 +113,6 @@ for k = 1:duration
         % Distance partitioning for each Partition P
         P{end + 1} = distance_partitioning(i, Meas);
     end
-%     P = removeDuplicatePartitions(P);
 
 %% Kinematic update
     %%% Miss detection
@@ -138,18 +151,6 @@ for k = 1:duration
         end
     end
 
-    sum_tmp = 0;
-    for n_P = 1 : size(P, 2)
-        sum_tmp = sum_tmp + sum(dW{n_P}, 'all');   % sum of all partition weight
-    end
-
-    % Normalize partition weight
-    w_P = zeros(1, size(P, 2));
-    for n_P = 1 : size(P, 2)
-        w_P(n_P) = sum(dW{n_P}, 'all') / sum_tmp;  % weight of each partition (12i)
-        P{n_P}.w_P = w_P(n_P);
-    end
-
     % Update kinematic
     for n_P = 1 : size(P, 2)
         P{n_P}.w_P = w_P(n_P);
@@ -157,12 +158,16 @@ for k = 1:duration
         for m_W = 1 : size(P{n_P}.W, 2)
             W_meas = P{n_P}.W{m_W}.Meas;     % Set of measurements in Cell W{m}
             if ~isempty(W_meas)
+                % Likelihood of all measurements in W_meas with m_predict and P_predict
+                l{n_P}{m_W} = cal_likelihood(W_meas, model, m_predict, P_predict);
                 [m_temp, P_temp] = update_KF(W_meas, model, m_predict, P_predict);
                 l_tmp = l{n_P}{m_W} / (lambda_c * pdf_c);  % likelihood (12d)
                 l_tmp = prod(l_tmp, 2);
 
                 gamma = exp(-lambda_z) * lambda_z^size(W_meas, 2);       % gamma (12c)
-                w_temp = w_P(n_P) * gamma * model.P_D * w_predict .* l_tmp / dW{n_P}(m_W); % weight (12b)
+                dW_temp{n_P}{m_W} = gamma * model.P_D * w_predict .* l_tmp;
+                dW{n_P}(m_W) = (size(W_meas, 2) == 1) + sum(dW_temp{n_P}{m_W}, 'all'); % (12j)
+                w_temp = gamma * model.P_D * w_predict .* l_tmp / dW{n_P}(m_W); % weight (12b)
 
                 P{n_P}.W{m_W}.w_temp = w_temp;
                 for idx = 1 : size(w_temp, 1)
@@ -173,12 +178,25 @@ for k = 1:duration
             end
         end
     end
+    
+    sum_tmp = 0;
+    for n_P = 1 : size(P, 2)
+        sum_tmp = sum_tmp + sum(dW{n_P}, 'all');   % sum of all partition weight
+    end
+
+    % Normalize partition weight
+    w_P = zeros(1, size(P, 2));
+    for n_P = 1 : size(P, 2)
+        w_P(n_P) = sum(dW{n_P}, 'all') / sum_tmp;  % weight of each partition (12i)
+        w_update{k}(L_predict:L_predict + n) = w_update{k}()
+        P{n_P}.w_P = w_P(n_P);
+    end
 
     [w_update{k}, m_update{k}, P_update{k}] = gaus_prune(w_update{k}, m_update{k}, P_update{k}, elim_threshold);
     [w_update{k}, m_update{k}, P_update{k}] = gaus_merge(w_update{k}, m_update{k}, P_update{k}, merge_threshold);
     [w_update{k}, m_update{k}, P_update{k}] = gaus_cap(w_update{k}, m_update{k}, P_update{k}, L_max);
 
-    num_targets(k) = floor(sum(w_update{k}));
+    num_targets(k) = round(sum(w_update{k}));
     w_copy = w_update{k};
 
     indices = [];
@@ -234,10 +252,10 @@ for k = 1:duration
     end
 
     if k >= model.t_birth
-        gt_extend{k} = {[model.gt1(1:2, k); model.gt1_shape]'; [model.gt2(1:2, k); model.gt2_shape]'; ...
-            [model.gt3(1:2, k); model.p_birth]'};
+        gt_extend{k} = {[model.gt1(1:2, k); model.gt1_shape] [model.gt2(1:2, k); model.gt2_shape] ...
+            [model.gt3(1:2, k); model.p_birth]};
     else
-        gt_extend{k} = {[model.gt1(1:2, k); model.gt1_shape]'; [model.gt2(1:2, k); model.gt2_shape]'};
+        gt_extend{k} = {[model.gt1(1:2, k); model.gt1_shape] [model.gt2(1:2, k); model.gt2_shape]};
     end
 
     result_extend{k}.r = r{k};
@@ -255,27 +273,60 @@ for k = 1:duration
 end
 
 %% Plot and visualize
-figure;
-hold on
-gt_plot = plot([model.gt1(1,:), NaN, model.gt2(1,:)], [model.gt1(2,:), NaN, model.gt2(2,:)], '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
-birth_plot = plot(model.gt3(1, model.t_birth:model.duration), ...
-        model.gt3(2, model.t_birth:model.duration), '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
-for t = 1:model.duration
-
-    for k = 1:num_targets(t)
-        est_plot = plot(est_m{t}(1, k), est_m{t}(2, k), 'b*');
+% Plot groundtruths
+doplot_gt = 0;     % plot ground-truth enable
+if doplot_gt
+    figure(1);
+    hold on;
+    gt1_plot = plot(model.gt1(1,:), model.gt1(2,:), '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    gt2_plot = plot(model.gt2(1,:), model.gt2(2,:), '-g.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    birth_plot = plot(model.gt3(1, model.t_birth:model.duration), ...
+        model.gt3(2, model.t_birth:model.duration), '-b.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    for t = 1 : model.duration
+        plot_extent([model.gt1(1:2,t); model.gt1_shape], '-', 'r', 1);
+        plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);
+        
+        if t >= model.t_birth
+            plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'b', 1);
+        end
     end
-
-    meas_plot = plot(model.z{t}(1,:), model.z{t}(2,:), 'k.', 'MarkerSize', 1);
+    xlim([model.range_c(1,1)-10 model.range_c(1,2)]);
+    ylim([model.range_c(2,1)-10 model.range_c(2,2)]);
+    grid on
+    xlabel('Position X');
+    ylabel('Position Y');
+%     title('Ground-truth');
+    legend([gt1_plot, gt2_plot, birth_plot], 'Object 1', 'Object 2', 'Object Birth', 'Location', 'northwest');
+end
+% Plot measurements
+doplot_meas = 0;     % plot measurements enable
+if doplot_meas
+    figure(2);
+    hold on;
+    gt1_plot = plot(model.gt1(1,:), model.gt1(2,:), '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    gt2_plot = plot(model.gt2(1,:), model.gt2(2,:), '-g.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    birth_plot = plot(model.gt3(1, model.t_birth:model.duration), ...
+        model.gt3(2, model.t_birth:model.duration), '-b.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    for t = 1 : model.duration
+        plot_extent([model.gt1(1:2,t); model.gt1_shape], '-', 'r', 1);
+        plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);
+        
+        if t >= model.t_birth
+            plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'b', 1);
+        end
+        meas_plot = plot(model.z{t}(1,:), model.z{t}(2,:), 'k.', 'MarkerSize', 5);
+        clutter_plot = plot(model.c{t}(1, :), model.c{t}(2, :), 'm*', 'MarkerSize', 5);
+    end
+    xlim([model.range_c(1,1)-10 model.range_c(1,2)]);
+    ylim([model.range_c(2,1)-10 model.range_c(2,2)]);
+    xlabel('Position X');
+    ylabel('Position Y');
+%     title('Measurements');
+    legend([gt1_plot, gt2_plot, birth_plot, meas_plot, clutter_plot], 'Object 1', 'Object 2', 'Birth Object', 'Measurement', ...
+        'Clutter', 'Location', 'bestoutside');
 end
 
-xlim([model.range_c(1,1) model.range_c(1,2)]+10);
-ylim([model.range_c(2,1) model.range_c(2,2)+10]);
-xlabel('Position X');
-ylabel('Position Y');
-title('GM-PHD Estimation');
-legend([gt_plot, birth_plot, est_plot, meas_plot], 'Ground-truth', 'Birth', 'Estimation', 'Measurement', 'Location', 'bestoutside');
-
+% Plot estimation
 figure (3);
 hold on;
 
@@ -287,23 +338,24 @@ for t = 1:duration
         gt_plot2 = plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);
         if t >= model.t_birth
             gt_center_plot3 = plot(model.gt3(1,t), model.gt3(2,t), 'r.');
-            gt_plot3 = plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'y', 1);
+            gt_plot3 = plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'm', 1);
         end
 
         for n = 1 : num_targets(t)
-           est_center_plot = plot(r{t}(1, n), r{t}(2, n), 'b+');
+           est_center_plot = plot(r{t}(1, n), r{t}(2, n), 'b.');
            est_plot = plot_extent([r{t}(1:2, n); p{t}(:, n)], '-', 'b', 1);
-           meas_plot = plot(result_extend{t}.meas{n}(1, :), result_extend{t}.meas{n}(2, :), 'k^');
+           meas_plot = plot(result_extend{t}.meas{n}(1, :), result_extend{t}.meas{n}(2, :), 'k.');
         end
     end
 end
 
-xlim([model.range_c(1,1) 600]);
-ylim([model.range_c(2,1) 600]);
+xlim([model.range_c(1,1)-10 model.range_c(1,2)]);
+ylim([model.range_c(2,1)-10 model.range_c(2,2)]);
 xlabel('Position X');
 ylabel('Position Y');
-title('Extended GM-PHD Estimation');
-legend([gt_plot1, gt_plot2, gt_plot3, est_plot], 'Ground-truth 1', 'Ground-truth 2', 'Birth', 'Estimation', 'Location', 'southeast');
+% title('Extended GM-PHD Estimation');
+legend([gt_plot1, gt_plot2, gt_plot3, est_plot, meas_plot], 'Ground-truth 1', 'Ground-truth 2', ...
+    'Ground-truth Birth', 'Estimation', 'Cell measurement', 'Location', 'southeast');
 
 %% Evaluation
 doPlotOSPA_kinematic = false;
@@ -346,23 +398,32 @@ if doPlotOSPA_extend
     gt_mat = cell(1, duration);
     est_mat = cell(1, duration);
     for t = 1:duration
-        % Optimal assignment between estimate and groundtruth
-        [est_extend{t}, gt_extend{t}] = est_assignment(est_extend{t}, gt_extend{t});
-        for i = 1:num_targets(t)
-            [gt_mat_tmp, est_mat_tmp] = get_uniform_points_boundary(gt_extend{t}{i}, est_extend{t}{i}, 50);
-            gt_mat{t} = [gt_mat{t}, gt_mat_tmp];
-            est_mat{t} = [est_mat{t}, est_mat_tmp];
+        ospa(t) = 0;
+        if num_targets(k) ~= 0
+            % Optimal assignment between estimate and groundtruth
+            [est_extend{t}, gt_extend{t}, dim] = est_assignment(est_extend{t}, gt_extend{t});
+            for i = 1:dim
+                if isempty(gt_extend{t}{i}) || isempty(est_extend{t}{i})
+                    ospa(t) = ospa(t) + ospa_cutoff;
+                else
+                    [gt_mat_tmp, est_mat_tmp] = get_uniform_points_boundary(gt_extend{t}{i}', est_extend{t}{i}', 50);
+                    ospa(t) = ospa(t) + ospa_dist(gt_mat_tmp, est_mat_tmp, ospa_cutoff, ospa_order);
+                end
+            end
+            ospa(t) = ospa(t) / dim;
+        else
+            ospa(t) = ospa_cutoff;
         end
-        ospa(t) = ospa_dist(gt_mat{t}, est_mat{t}, ospa_cutoff, ospa_order);
     end
 
     figure (4);
     hold on;
-    plot(1:duration, ospa(1:end));
+    ospa_plot = plot(1:duration, ospa(1:end));
 
     ylim([0 ospa_cutoff]);
     xlim([1 duration]);
     xlabel('Time step');
     ylabel('Distance (in m)');
-    title('OSPA Evaluation');
+%     title('OSPA Evaluation');
+    legend(ospa_plot, 'OSPA distance','Location','best')
 end

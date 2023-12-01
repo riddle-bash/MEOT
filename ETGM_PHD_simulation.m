@@ -9,8 +9,22 @@
 
 clc, clear, close all;
 %% Simulation setting
-mode = 1;      % Num of Scenario
-model = gen_model(mode);
+mode = 2;      % Num of Scenario
+if mode == 1
+    if exist('Data/model_scenario1.mat', 'file') == 2
+        loadedData = load('Data/model_scenario1.mat');
+        model = loadedData.model;
+    else
+        model = gen_model(1);
+    end
+elseif mode == 2
+    if exist('Data/model_scenario2.mat', 'file') == 2
+        loadedData = load('Data/model_scenario2.mat');
+        model = loadedData.model;
+    else
+        model = gen_model(2);
+    end
+end
 duration = model.duration;
 
 %% Ground-truth, noise setting
@@ -33,16 +47,16 @@ P_update = cell(1,duration);
 w_update{1} = [.5 ; .5];
 switch mode
     case 1
-        m_update{1}(:, 1) = [100; 0; 20; 20];
+        m_update{1}(:, 1) = [100; 0; 10; 10];
         P_update{1}(:, :, 1) = diag([100 100 20 30]);
 
-        m_update{1}(:, 2) = [100; 500; 15; -20];
+        m_update{1}(:, 2) = [100; 200; 10; 10];
         P_update{1}(:, :, 2) = diag([100 100 20 30]);
     case 2
-        m_update{1}(:, 1) = [100; 100; 10; 20];
+        m_update{1}(:, 1) = [200; 100; -10; 10];
         P_update{1}(:, :, 1) = diag([100 100 20 30]);
 
-        m_update{1}(:, 2) = [300; 500; -10; -20];
+        m_update{1}(:, 2) = [100; 200; 10; 10];
         P_update{1}(:, :, 2) = diag([100 100 20 30]);
 end
 
@@ -99,7 +113,6 @@ for k = 1:duration
         % Distance partitioning for each Partition P
         P{end + 1} = distance_partitioning(i, Meas);
     end
-%     P = removeDuplicatePartitions(P);
 
 %% Kinematic update
     %%% Miss detection
@@ -178,7 +191,7 @@ for k = 1:duration
     [w_update{k}, m_update{k}, P_update{k}] = gaus_merge(w_update{k}, m_update{k}, P_update{k}, merge_threshold);
     [w_update{k}, m_update{k}, P_update{k}] = gaus_cap(w_update{k}, m_update{k}, P_update{k}, L_max);
 
-    num_targets(k) = floor(sum(w_update{k}));
+    num_targets(k) = round(sum(w_update{k}));
     w_copy = w_update{k};
 
     indices = [];
@@ -255,27 +268,60 @@ for k = 1:duration
 end
 
 %% Plot and visualize
-figure;
-hold on
-gt_plot = plot([model.gt1(1,:), NaN, model.gt2(1,:)], [model.gt1(2,:), NaN, model.gt2(2,:)], '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
-birth_plot = plot(model.gt3(1, model.t_birth:model.duration), ...
-        model.gt3(2, model.t_birth:model.duration), '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
-for t = 1:model.duration
-
-    for k = 1:num_targets(t)
-        est_plot = plot(est_m{t}(1, k), est_m{t}(2, k), 'b*');
+% Plot groundtruths
+doplot_gt = 1;     % plot ground-truth enable
+if doplot_gt
+    figure(1);
+    hold on;
+    gt1_plot = plot(model.gt1(1,:), model.gt1(2,:), '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    gt2_plot = plot(model.gt2(1,:), model.gt2(2,:), '-g.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    birth_plot = plot(model.gt3(1, model.t_birth:model.duration), ...
+        model.gt3(2, model.t_birth:model.duration), '-b.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    for t = 1 : model.duration
+        plot_extent([model.gt1(1:2,t); model.gt1_shape], '-', 'r', 1);
+        plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);
+        
+        if t >= model.t_birth
+            plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'b', 1);
+        end
     end
-
-    meas_plot = plot(model.z{t}(1,:), model.z{t}(2,:), 'k.', 'MarkerSize', 1);
+    xlim([model.range_c(1,1)-10 model.range_c(1,2)]);
+    ylim([model.range_c(2,1)-10 model.range_c(2,2)]);
+    grid on
+    xlabel('Position X');
+    ylabel('Position Y');
+%     title('Ground-truth');
+    legend([gt1_plot, gt2_plot, birth_plot], 'Object 1', 'Object 2', 'Object Birth', 'Location', 'northwest');
+end
+% Plot measurements
+doplot_meas = 1;     % plot measurements enable
+if doplot_meas
+    figure(2);
+    hold on;
+    gt1_plot = plot(model.gt1(1,:), model.gt1(2,:), '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    gt2_plot = plot(model.gt2(1,:), model.gt2(2,:), '-g.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    birth_plot = plot(model.gt3(1, model.t_birth:model.duration), ...
+        model.gt3(2, model.t_birth:model.duration), '-b.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    for t = 1 : model.duration
+        plot_extent([model.gt1(1:2,t); model.gt1_shape], '-', 'r', 1);
+        plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);
+        
+        if t >= model.t_birth
+            plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'b', 1);
+        end
+        meas_plot = plot(model.z{t}(1,:), model.z{t}(2,:), 'k.', 'MarkerSize', 5);
+        clutter_plot = plot(model.c{t}(1, :), model.c{t}(2, :), 'm*', 'MarkerSize', 5);
+    end
+    xlim([model.range_c(1,1)-10 model.range_c(1,2)]);
+    ylim([model.range_c(2,1)-10 model.range_c(2,2)]);
+    xlabel('Position X');
+    ylabel('Position Y');
+%     title('Measurements');
+    legend([gt1_plot, gt2_plot, birth_plot, meas_plot, clutter_plot], 'Object 1', 'Object 2', 'Birth Object', 'Measurement', ...
+        'Clutter', 'Location', 'bestoutside');
 end
 
-xlim([model.range_c(1,1) model.range_c(1,2)]+10);
-ylim([model.range_c(2,1) model.range_c(2,2)+10]);
-xlabel('Position X');
-ylabel('Position Y');
-title('GM-PHD Estimation');
-legend([gt_plot, birth_plot, est_plot, meas_plot], 'Ground-truth', 'Birth', 'Estimation', 'Measurement', 'Location', 'bestoutside');
-
+% Plot estimation
 figure (3);
 hold on;
 
@@ -287,23 +333,24 @@ for t = 1:duration
         gt_plot2 = plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);
         if t >= model.t_birth
             gt_center_plot3 = plot(model.gt3(1,t), model.gt3(2,t), 'r.');
-            gt_plot3 = plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'y', 1);
+            gt_plot3 = plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'm', 1);
         end
 
         for n = 1 : num_targets(t)
-           est_center_plot = plot(r{t}(1, n), r{t}(2, n), 'b+');
+           est_center_plot = plot(r{t}(1, n), r{t}(2, n), 'b.');
            est_plot = plot_extent([r{t}(1:2, n); p{t}(:, n)], '-', 'b', 1);
-           meas_plot = plot(result_extend{t}.meas{n}(1, :), result_extend{t}.meas{n}(2, :), 'k^');
+           meas_plot = plot(result_extend{t}.meas{n}(1, :), result_extend{t}.meas{n}(2, :), 'k.');
         end
     end
 end
 
-xlim([model.range_c(1,1) 600]);
-ylim([model.range_c(2,1) 600]);
+xlim([model.range_c(1,1)-10 model.range_c(1,2)]);
+ylim([model.range_c(2,1)-10 model.range_c(2,2)]);
 xlabel('Position X');
 ylabel('Position Y');
-title('Extended GM-PHD Estimation');
-legend([gt_plot1, gt_plot2, gt_plot3, est_plot], 'Ground-truth 1', 'Ground-truth 2', 'Birth', 'Estimation', 'Location', 'southeast');
+% title('Extended GM-PHD Estimation');
+legend([gt_plot1, gt_plot2, gt_plot3, est_plot, meas_plot], 'Ground-truth 1', 'Ground-truth 2', ...
+    'Ground-truth Birth', 'Estimation', 'Cell measurement', 'Location', 'southeast');
 
 %% Evaluation
 doPlotOSPA_kinematic = false;
@@ -358,7 +405,7 @@ if doPlotOSPA_extend
                     ospa(t) = ospa(t) + ospa_dist(gt_mat_tmp, est_mat_tmp, ospa_cutoff, ospa_order);
                 end
             end
-            ospa(t) = ospa(t) / num_targets(t);
+            ospa(t) = ospa(t) / dim;
         else
             ospa(t) = ospa_cutoff;
         end
@@ -366,11 +413,12 @@ if doPlotOSPA_extend
 
     figure (4);
     hold on;
-    plot(1:duration, ospa(1:end));
+    ospa_plot = plot(1:duration, ospa(1:end));
 
     ylim([0 ospa_cutoff]);
     xlim([1 duration]);
     xlabel('Time step');
     ylabel('Distance (in m)');
-    title('OSPA Evaluation');
+%     title('OSPA Evaluation');
+    legend(ospa_plot, 'OSPA distance','Location','best')
 end

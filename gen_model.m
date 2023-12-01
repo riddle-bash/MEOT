@@ -8,16 +8,16 @@ model.truckSize = [15; 3];
 
 switch m
     case 1
-        model.gt1(:,1) = [0; 10; 20; 20];
+        model.gt1(:,1) = [0; 0; 10; 10];
         model.gt1_shape = [56.3/180 * pi; 1 * model.carSize];
 
-        model.gt2(:,1) = [10; 450; 20; -20];
+        model.gt2(:,1) = [0; 100; 10; 10];
         model.gt2_shape = [56.3/180 * pi; 1 * model.carSize];
     case 2
-        model.gt1(:,1) = [0; 0; 10; 20];
+        model.gt1(:,1) = [200; 0; -10; 10];
         model.gt1_shape = [56.3/180 * pi; 1 * model.carSize];
 
-        model.gt2(:,1) = [500; 500; -10; -20];
+        model.gt2(:,1) = [100; 0; 10; 10];
         model.gt2_shape = [56.3/180 * pi; 1 * model.carSize];
 end
 
@@ -43,7 +43,7 @@ model.H = [1 0 0 0;
            0 1 0 0;
           ]; 
 % Transition Noise
-Trans_noise_mag = 2;
+Trans_noise_mag = 0.5;
 %upx^2 = 3, upy^2 = 2.5, uvx^2 = 2, upy^2 = 1
 model.Q = [3 0 0 0;
            0 2.5 0 0;
@@ -68,7 +68,7 @@ model.P_birth= zeros(model.xdim,model.xdim,model.L_birth);            % cov of G
 model.p_birth= zeros(3,model.L_birth);                                % shape of Gaussian birth terms
         
 model.w_birth = .01;                                         % weight
-model.m_birth = [450; 200; -10; -20];                         % kinematic state
+model.m_birth = [300; 300; -10; -20];                         % kinematic state
 model.P_birth = diag([100 100 20 20]);                      % cov
 model.p_birth = [56.3/180 * pi; 1 * model.carSize];         % extent state
 
@@ -78,7 +78,7 @@ model.P_MD= 1-model.P_D; % probability of missed detection in measurements
 
 % Clutter parameters
 model.lambda_c = 7; % clutter rate
-model.range_c= [0 500; 0 500];      % uniform clutter region
+model.range_c= [0 350; 0 350];      % uniform clutter region
 model.pdf_c= 1/prod(model.range_c(:,2)-model.range_c(:,1)); % uniform clutter density
 
 %% Generate groundtruth
@@ -143,25 +143,55 @@ for i = 1:model.duration
     model.z{i} = [model.z{i} model.c{i}];
 end
 
-%% Plot groundtruths and measurements
-doplot = 0;     % plot ground-truth enable
-if doplot
+%% Plot groundtruths
+doplot_gt = 0;     % plot ground-truth enable
+if doplot_gt
     figure(1);
     hold on;
-    gt_plot = plot([model.gt1(1,:), NaN, model.gt2(1,:)], [model.gt1(2,:), NaN, model.gt2(2,:)], '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    gt1_plot = plot(model.gt1(1,:), model.gt1(2,:), '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    gt2_plot = plot(model.gt2(1,:), model.gt2(2,:), '-g.', 'LineWidth', 1.5, 'MarkerSize', 15);
     birth_plot = plot(model.gt3(1, model.t_birth:model.duration), ...
-        model.gt3(2, model.t_birth:model.duration), '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
+        model.gt3(2, model.t_birth:model.duration), '-b.', 'LineWidth', 1.5, 'MarkerSize', 15);
     for t = 1 : model.duration
         plot_extent([model.gt1(1:2,t); model.gt1_shape], '-', 'r', 1);
         plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);
-        meas_plot = plot(model.z{t}(1,:), model.z{t}(2,:), 'k+', 'MarkerSize', 5);
-        clutter_plot = plot(model.c{t}(1, :), model.c{t}(2, :), 'b*', 'MarkerSize', 5);
+        
+        if t >= model.t_birth
+            plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'b', 1);
+        end
     end
-    xlim([model.range_c(1,1)-10 model.range_c(1,2)+10]);
-    ylim([model.range_c(2,1)-10 model.range_c(2,2)+10]);
+    xlim([model.range_c(1,1)-10 model.range_c(1,2)]);
+    ylim([model.range_c(2,1)-10 model.range_c(2,2)]);
+    grid on
     xlabel('Position X');
     ylabel('Position Y');
-    title('Sensor FOV');
-    legend([gt_plot, birth_plot, meas_plot, clutter_plot], 'Ground-truth', 'Birth', 'Measurement', ...
-        'Clutter', 'Location', 'southeast');
+    title('Ground-truth');
+    legend([gt1_plot, gt2_plot, birth_plot], 'Object 1', 'Object 2', 'Object Birth', 'Location', 'northwest');
+end
+%% Plot measurements
+doplot_meas = 0;     % plot measurements enable
+if doplot_meas
+    figure(2);
+    hold on;
+    gt1_plot = plot(model.gt1(1,:), model.gt1(2,:), '-r.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    gt2_plot = plot(model.gt2(1,:), model.gt2(2,:), '-g.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    birth_plot = plot(model.gt3(1, model.t_birth:model.duration), ...
+        model.gt3(2, model.t_birth:model.duration), '-b.', 'LineWidth', 1.5, 'MarkerSize', 15);
+    for t = 1 : model.duration
+        plot_extent([model.gt1(1:2,t); model.gt1_shape], '-', 'r', 1);
+        plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);
+        
+        if t >= model.t_birth
+            plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'b', 1);
+        end
+        meas_plot = plot(model.z{t}(1,:), model.z{t}(2,:), 'k.', 'MarkerSize', 5);
+        clutter_plot = plot(model.c{t}(1, :), model.c{t}(2, :), 'm*', 'MarkerSize', 5);
+    end
+    xlim([model.range_c(1,1)-10 model.range_c(1,2)]);
+    ylim([model.range_c(2,1)-10 model.range_c(2,2)]);
+    xlabel('Position X');
+    ylabel('Position Y');
+    title('Measurements');
+    legend([gt1_plot, gt2_plot, birth_plot, meas_plot, clutter_plot], 'Object 1', 'Object 2', 'Birth Object', 'Measurement', ...
+        'Clutter', 'Location', 'bestoutside');
 end
