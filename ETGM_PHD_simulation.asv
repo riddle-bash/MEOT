@@ -9,7 +9,7 @@
 
 clc, clear, close all;
 %% Simulation setting
-mode = 2;      % Num of Scenario
+mode = 1;      % Num of Scenario
 if mode == 1
     if exist('Data/model_scenario1.mat', 'file') == 2
         loadedData = load('Data/model_scenario1.mat');
@@ -47,7 +47,7 @@ P_update = cell(1,duration);
 w_update{1} = [.5 ; .5];
 switch mode
     case 1
-        m_update{1}(:, 1) = [100; 0; 10; 10];
+        m_update{1}(:, 1) = [100; 100; 10; 10];
         P_update{1}(:, :, 1) = diag([100 100 20 30]);
 
         m_update{1}(:, 2) = [100; 200; 10; 10];
@@ -56,7 +56,7 @@ switch mode
         m_update{1}(:, 1) = [200; 100; -10; 10];
         P_update{1}(:, :, 1) = diag([100 100 20 30]);
 
-        m_update{1}(:, 2) = [100; 200; 10; 10];
+        m_update{1}(:, 2) = [200; 200; 10; 10];
         P_update{1}(:, :, 2) = diag([100 100 20 30]);
 end
 
@@ -151,34 +151,6 @@ for k = 1:duration
         end
     end
 
-    % Update kinematic
-    for n_P = 1 : size(P, 2)
-        P{n_P}.w_P = w_P(n_P);
-        % W_card = size(P{n_P}.W, 2);
-        for m_W = 1 : size(P{n_P}.W, 2)
-            W_meas = P{n_P}.W{m_W}.Meas;     % Set of measurements in Cell W{m}
-            if ~isempty(W_meas)
-                % Likelihood of all measurements in W_meas with m_predict and P_predict
-                l{n_P}{m_W} = cal_likelihood(W_meas, model, m_predict, P_predict);
-                [m_temp, P_temp] = update_KF(W_meas, model, m_predict, P_predict);
-                l_tmp = l{n_P}{m_W} / (lambda_c * pdf_c);  % likelihood (12d)
-                l_tmp = prod(l_tmp, 2);
-
-                gamma = exp(-lambda_z) * lambda_z^size(W_meas, 2);       % gamma (12c)
-                dW_temp{n_P}{m_W} = gamma * model.P_D * w_predict .* l_tmp;
-                dW{n_P}(m_W) = (size(W_meas, 2) == 1) + sum(dW_temp{n_P}{m_W}, 'all'); % (12j)
-                w_temp = gamma * model.P_D * w_predict .* l_tmp / dW{n_P}(m_W); % weight (12b)
-
-                P{n_P}.W{m_W}.w_temp = w_temp;
-                for idx = 1 : size(w_temp, 1)
-                   w_update{k} = cat(1, w_update{k}, w_temp(idx));
-                   m_update{k} = cat(2, m_update{k}, m_temp(:, idx));
-                   P_update{k} = cat(3, P_update{k}, P_temp);
-                end
-            end
-        end
-    end
-    
     sum_tmp = 0;
     for n_P = 1 : size(P, 2)
         sum_tmp = sum_tmp + sum(dW{n_P}, 'all');   % sum of all partition weight
@@ -188,8 +160,31 @@ for k = 1:duration
     w_P = zeros(1, size(P, 2));
     for n_P = 1 : size(P, 2)
         w_P(n_P) = sum(dW{n_P}, 'all') / sum_tmp;  % weight of each partition (12i)
-        w_update{k}(L_predict:L_predict + n) = w_update{k}()
         P{n_P}.w_P = w_P(n_P);
+    end
+
+    % Update kinematic
+    for n_P = 1 : size(P, 2)
+        P{n_P}.w_P = w_P(n_P);
+        % W_card = size(P{n_P}.W, 2);
+        for m_W = 1 : size(P{n_P}.W, 2)
+            W_meas = P{n_P}.W{m_W}.Meas;     % Set of measurements in Cell W{m}
+            if ~isempty(W_meas)
+                [m_temp, P_temp] = update_KF(W_meas, model, m_predict, P_predict);
+                l_tmp = l{n_P}{m_W} / (lambda_c * pdf_c);  % likelihood (12d)
+                l_tmp = prod(l_tmp, 2);
+
+                gamma = exp(-lambda_z) * lambda_z^size(W_meas, 2);       % gamma (12c)
+                w_temp = w_P(n_P) * gamma * model.P_D * w_predict .* l_tmp / dW{n_P}(m_W); % weight (12b)
+
+                P{n_P}.W{m_W}.w_temp = w_temp;
+                for idx = 1 : size(w_temp, 1)
+                   w_update{k} = cat(1, w_update{k}, w_temp(idx));
+                   m_update{k} = cat(2, m_update{k}, m_temp(:, idx));
+                   P_update{k} = cat(3, P_update{k}, P_temp);
+                end
+            end
+        end
     end
 
     [w_update{k}, m_update{k}, P_update{k}] = gaus_prune(w_update{k}, m_update{k}, P_update{k}, elim_threshold);
@@ -272,9 +267,48 @@ for k = 1:duration
         ', execution time = ', num2str(exec_time(k)) , 's']);
 end
 
+%% Plot step
+figure(5);
+hold on
+grid on
+start_idx = 10;
+end_idx = 14;
+gt_center_plot1 = plot(model.gt1(1,start_idx:end_idx), model.gt1(2,start_idx:end_idx), '--r.');
+gt_center_plot2 = plot(model.gt2(1,start_idx:end_idx), model.gt2(2,start_idx:end_idx), '--g.');
+gt_center_plot3 = plot(model.gt3(1,start_idx:end_idx), model.gt3(2,start_idx:end_idx), '--m.');
+for t = start_idx : end_idx
+    gt_plot1 = plot_extent([model.gt1(1:2,t); model.gt1_shape], '-', 'r', 1);
+    gt_plot2 = plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);
+    
+    if t >= model.t_birth
+        gt_plot3 = plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'm', 1);
+    end
+
+    % Tăng giá trị "hue" (màu sắc) để đảm bảo màu phân biệt
+    hue = mod(t * 0.01, 1); % Tăng giá trị "hue" theo mong muốn
+    
+    % Chuyển đổi từ không gian màu HSV sang RGB
+    rgb_color = hsv2rgb([hue, 1, 1]);
+
+    for n = 1 : num_targets(t)
+        est_center_plot = plot(r{t}(1, n), r{t}(2, n), 'b.');
+        est_plot = plot_extent([r{t}(1:2, n); p{t}(:, n)], '-', 'b', 1);
+        meas_plot = plot(result_extend{t}.meas{n}(1, :), result_extend{t}.meas{n}(2, :), '.', ...
+            'color', rgb_color, 'MarkerSize', 10);
+    end
+end
+
+axis xy;
+xlabel('Position X');
+ylabel('Position Y');
+% title('Extended GM-PHD Estimation');
+% legend([gt_plot1, gt_plot2, est_plot, meas_plot], 'Ground-truth 1', 'Ground-truth 2', ...
+%     'Estimation', 'Cell measurement', 'Location', 'best');
+legend([gt_plot1, gt_plot2, gt_plot3, est_plot, meas_plot], 'Ground-truth 1', 'Ground-truth 2', ...
+    'Ground-truth Birth', 'Estimation', 'Cell measurement', 'Location', 'southeast');
 %% Plot and visualize
 % Plot groundtruths
-doplot_gt = 0;     % plot ground-truth enable
+doplot_gt = 1;     % plot ground-truth enable
 if doplot_gt
     figure(1);
     hold on;
@@ -299,7 +333,7 @@ if doplot_gt
     legend([gt1_plot, gt2_plot, birth_plot], 'Object 1', 'Object 2', 'Object Birth', 'Location', 'northwest');
 end
 % Plot measurements
-doplot_meas = 0;     % plot measurements enable
+doplot_meas = 1;     % plot measurements enable
 if doplot_meas
     figure(2);
     hold on;
@@ -387,7 +421,7 @@ if doPlotOSPA_kinematic
     title('OSPA Evaluation');
 end
 
-doPlotOSPA_extend = true;
+doPlotOSPA_extend = false;
 disp(['------------------------------Total run time: ', num2str(sum(exec_time, 2)), 's---------------------------']);
 
 if doPlotOSPA_extend

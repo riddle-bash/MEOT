@@ -47,7 +47,7 @@ P_update = cell(1,duration);
 w_update{1} = [.5 ; .5];
 switch mode
     case 1
-        m_update{1}(:, 1) = [100; 0; 10; 10];
+        m_update{1}(:, 1) = [100; 100; 10; 10];
         P_update{1}(:, :, 1) = diag([100 100 20 30]);
 
         m_update{1}(:, 2) = [100; 200; 10; 10];
@@ -56,7 +56,7 @@ switch mode
         m_update{1}(:, 1) = [200; 100; -10; 10];
         P_update{1}(:, :, 1) = diag([100 100 20 30]);
 
-        m_update{1}(:, 2) = [100; 200; 10; 10];
+        m_update{1}(:, 2) = [200; 200; 10; 10];
         P_update{1}(:, :, 2) = diag([100 100 20 30]);
 end
 
@@ -267,6 +267,82 @@ for k = 1:duration
         ', execution time = ', num2str(exec_time(k)) , 's']);
 end
 
+%% Plot scenario mode 1
+if mode == 1
+    figure(5);
+    hold on
+    grid on
+    start_idx = 10;
+    end_idx = 14;
+    gt_center_plot1 = plot(model.gt1(1,start_idx:end_idx), model.gt1(2,start_idx:end_idx), '--r.');
+    gt_center_plot2 = plot(model.gt2(1,start_idx:end_idx), model.gt2(2,start_idx:end_idx), '--g.');
+    gt_center_plot3 = plot(model.gt3(1,start_idx:end_idx), model.gt3(2,start_idx:end_idx), '--m.');
+    
+    num_colors = sum(num_targets(start_idx : end_idx));
+    cmap = hsv(num_colors);
+    color_idx = 1;
+    for t = start_idx : end_idx
+        gt_plot1 = plot_extent([model.gt1(1:2,t); model.gt1_shape], '-', 'r', 1);
+        gt_plot2 = plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);
+        
+        if t >= model.t_birth
+            gt_plot3 = plot_extent([model.gt3(1:2,t); model.p_birth], '-', 'm', 1);
+        end
+    
+        for n = 1 : num_targets(t)
+            color = cmap(color_idx, :);
+            color_idx = color_idx + 1;
+            est_center_plot = plot(r{t}(1, n), r{t}(2, n), 'b.');
+            est_plot = plot_extent([r{t}(1:2, n); p{t}(:, n)], '-', 'b', 1);
+            meas_plot = plot(result_extend{t}.meas{n}(1, :), result_extend{t}.meas{n}(2, :), '.', ...
+                'color', color, 'MarkerSize', 10);
+        end
+    end
+    
+    axis xy;
+    xlabel('Position X');
+    ylabel('Position Y');
+    % title('Extended GM-PHD Estimation');
+    % legend([gt_plot1, gt_plot2, est_plot, meas_plot], 'Ground-truth 1', 'Ground-truth 2', ...
+    %     'Estimation', 'Cell measurement', 'Location', 'best');
+    legend([gt_plot1, gt_plot2, gt_plot3, est_plot, meas_plot], 'Ground-truth 1', 'Ground-truth 2', ...
+        'Ground-truth Birth', 'Estimation', 'Cell measurement', 'Location', 'southeast');
+end
+%% Plot scenario mode 2
+if mode == 2
+    figure(5);
+    hold on
+    grid on
+    start_idx = 3;
+    end_idx = 9;
+    gt_center_plot1 = plot(model.gt1(1,start_idx:end_idx), model.gt1(2,start_idx:end_idx), '--r.');
+    gt_center_plot2 = plot(model.gt2(1,start_idx:end_idx), model.gt2(2,start_idx:end_idx), '--g.');
+
+    num_colors = sum(num_targets(start_idx : end_idx));
+    cmap = hsv(num_colors);
+    color_idx = 1;
+    for t = start_idx : end_idx
+        gt_plot1 = plot_extent([model.gt1(1:2,t); model.gt1_shape], '-', 'r', 1);
+        gt_plot2 = plot_extent([model.gt2(1:2,t); model.gt2_shape], '-', 'g', 1);    
+
+        for n = 1 : num_targets(t)
+            color = cmap(color_idx, :);
+            color_idx = color_idx + 1;
+            est_center_plot = plot(r{t}(1, n), r{t}(2, n), 'b.');
+            est_plot = plot_extent([r{t}(1:2, n); p{t}(:, n)], '-', 'b', 1);
+            meas_plot = plot(result_extend{t}.meas{n}(1, :), result_extend{t}.meas{n}(2, :), '.', ...
+                'color', color, 'MarkerSize', 15);
+        end
+    end
+    
+    xlim([100 220]);
+    ylim([0 100]);
+    xlabel('Position X');
+    ylabel('Position Y');
+    % title('Extended GM-PHD Estimation');
+    legend([gt_plot1, gt_plot2, est_plot, meas_plot], 'Ground-truth 1', 'Ground-truth 2', ...
+        'Estimation', 'Cell measurement', 'Location', 'best');
+end
 %% Plot and visualize
 % Plot groundtruths
 doplot_gt = 1;     % plot ground-truth enable
@@ -382,7 +458,7 @@ if doPlotOSPA_kinematic
     title('OSPA Evaluation');
 end
 
-doPlotOSPA_extend = true;
+doPlotOSPA_extend = false;
 disp(['------------------------------Total run time: ', num2str(sum(exec_time, 2)), 's---------------------------']);
 
 if doPlotOSPA_extend

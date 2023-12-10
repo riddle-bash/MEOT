@@ -16,7 +16,7 @@ mean_extend_ospa = zeros(1, 20);
 for i_loop = 1:multi_num_loop
     disp(['------------------------------Loop steps: ', num2str(i_loop) , '---------------------------']);
     %% Simulation setting
-    mode = 1;      % Num of Scenario
+    mode = 2;      % Num of Scenario
     model = gen_model(mode);
     duration = model.duration;
     
@@ -38,7 +38,7 @@ for i_loop = 1:multi_num_loop
     w_update{1} = [.5 ; .5];
     switch mode
         case 1
-            m_update{1}(:, 1) = [100; 0; 10; 10];
+            m_update{1}(:, 1) = [100; 100; 10; 10];
             P_update{1}(:, :, 1) = diag([100 100 20 30]);
     
             m_update{1}(:, 2) = [100; 200; 10; 10];
@@ -47,7 +47,7 @@ for i_loop = 1:multi_num_loop
             m_update{1}(:, 1) = [200; 100; -10; 10];
             P_update{1}(:, :, 1) = diag([100 100 20 30]);
     
-            m_update{1}(:, 2) = [100; 200; 10; 10];
+            m_update{1}(:, 2) = [200; 200; 10; 10];
             P_update{1}(:, :, 2) = diag([100 100 20 30]);
     end
     
@@ -336,5 +336,5 @@ ylim([0 200]);
 xlim([1 duration]);
 xlabel('Time step');
 ylabel('Distance (in m)');
-title('OSPA Evaluation of Extended Target');
+% title('OSPA Evaluation of Extended Target');
 legend(ospa_ext_plot,'OSPA distance','Location','best');

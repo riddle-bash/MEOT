@@ -9,16 +9,16 @@ model.truckSize = [15; 3];
 switch m
     case 1
         model.gt1(:,1) = [0; 0; 10; 10];
-        model.gt1_shape = [56.3/180 * pi; 1 * model.carSize];
+        model.gt1_shape = [pi/2-atan(10/10); 1 * model.carSize];
 
         model.gt2(:,1) = [0; 100; 10; 10];
-        model.gt2_shape = [56.3/180 * pi; 1 * model.carSize];
+        model.gt2_shape = [pi/2-atan(10/10); 1 * model.carSize];
     case 2
         model.gt1(:,1) = [200; 0; -10; 10];
-        model.gt1_shape = [56.3/180 * pi; 1 * model.carSize];
+        model.gt1_shape = [pi/2-atan(-10/10); 1 * model.carSize];
 
         model.gt2(:,1) = [100; 0; 10; 10];
-        model.gt2_shape = [56.3/180 * pi; 1 * model.carSize];
+        model.gt2_shape = [pi/2-atan(10/10); 1 * model.carSize];
 end
 
 % Transition model
@@ -47,8 +47,8 @@ Trans_noise_mag = 0.5;
 %upx^2 = 3, upy^2 = 2.5, uvx^2 = 2, upy^2 = 1
 model.Q = [3 0 0 0;
            0 2.5 0 0;
-           0 0 1 0;
-           0 0 0 1;
+           0 0 0 0;
+           0 0 0 0;
           ];
 model.Q = model.Q * Trans_noise_mag;
 % Measurement Noise
@@ -68,9 +68,9 @@ model.P_birth= zeros(model.xdim,model.xdim,model.L_birth);            % cov of G
 model.p_birth= zeros(3,model.L_birth);                                % shape of Gaussian birth terms
         
 model.w_birth = .01;                                         % weight
-model.m_birth = [300; 300; -10; -20];                         % kinematic state
+model.m_birth = [350; 300; -10; -20];                         % kinematic state
 model.P_birth = diag([100 100 20 20]);                      % cov
-model.p_birth = [56.3/180 * pi; 1 * model.carSize];         % extent state
+model.p_birth = [pi/2-atan(-10/-20); 1 * model.carSize];         % extent state
 
 % Detection parameters
 model.P_D = 0.99;       % probability of detection in measurements
